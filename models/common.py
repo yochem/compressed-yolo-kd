@@ -60,7 +60,6 @@ class QConv(nn.Module):
     default_act = nn.SiLU()  # default activation
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
-        print('initialized QConv')
         super().__init__()
         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False)
         self.bn = nn.BatchNorm2d(c2)
@@ -85,6 +84,7 @@ class QConv(nn.Module):
             qw = self.qweight()
             w = (qw.round() - qw).detach() + qw
             # TODO: is this correct?
+            assert self.conv.weight.shape == w.shape
             self.conv.weight = 2**self.e * w
         else:
             print('not training, skipping quantization')
@@ -95,6 +95,7 @@ class QConv(nn.Module):
             qw = self.qweight()
             w = (qw.round() - qw).detach() + qw
             # TODO: is this correct?
+            assert self.conv.weight.shape == w.shape
             self.conv.weight = 2**self.e * w
         else:
             print('not training, skipping quantization')
