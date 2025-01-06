@@ -84,17 +84,16 @@ class QConv(nn.Module):
             qw = self.qweight()
             w = (qw.round() - qw).detach() + qw
             qd = 2**self.e * w
+            print(self.conv.weight.shape, qd.shape)
             assert self.conv.weight.shape == qd.shape
             self.conv.weight = torch.nn.Parameter(qd)
-        else:
-            print('not training, skipping quantization')
 
     def forward(self, x):
-        self.quantize_conv_weights()
+        # self.quantize_conv_weights()
         return self.act(self.bn(self.conv(x)))
 
     def forward_fuse(self, x):
-        self.quantize_conv_weights()
+        # self.quantize_conv_weights()
         return self.act(self.conv(x))
 
 class Conv(nn.Module):
