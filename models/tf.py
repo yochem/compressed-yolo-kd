@@ -404,6 +404,7 @@ def parse_model(d, ch, model, imgsz):  # model_dict, input_channels(3)
             # QConv is just conv during inference
             if m == QConv:
                 m = Conv
+                m_str = 'Conv'
 
             args = [c1, c2, *args[1:]]
             if m in [BottleneckCSP, C3, C3x]:
