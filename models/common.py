@@ -83,9 +83,9 @@ class QConv(nn.Module):
         if self.training:
             qw = self.qweight()
             w = (qw.round() - qw).detach() + qw
-            # TODO: is this correct?
-            assert self.conv.weight.shape == w.shape
-            self.conv.weight = torch.nn.Parameter(2**self.e * w)
+            qd = 2**self.e * w
+            assert self.conv.weight.shape == qd.shape
+            self.conv.weight = torch.nn.Parameter(qd)
         else:
             print('not training, skipping quantization')
 
