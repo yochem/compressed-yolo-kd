@@ -21,6 +21,7 @@ import pandas as pd
 import requests
 import torch
 import torch.nn as nn
+import torch.functional as F
 from PIL import Image
 from torch.cuda import amp
 
@@ -53,6 +54,51 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
     return p
 
+
+class QConv(nn.Module):
+    # Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)
+    default_act = nn.SiLU()  # default activation
+
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
+        print('initialized QConv')
+        super().__init__()
+        self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False)
+        self.bn = nn.BatchNorm2d(c2)
+        self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
+        self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.))
+        self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 2.))
+
+    def qbits(self):
+        return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
+
+    def qweight(self):
+        return torch.minimum(
+            torch.maximum(
+                2**-self.e * self.conv.weight,
+                -2**(F.relu(self.b)-1)
+            ),
+            2**(F.relu(self.b)-1) - 1
+        )
+
+    def forward(self, x):
+        if self.training:
+            qw = self.qweight()
+            w = (qw.round() - qw).detach() + qw
+            # TODO: is this correct?
+            self.conv.weight = 2**self.e * w
+        else:
+            print('not training, skipping quantization')
+        return self.act(self.bn(self.conv(x)))
+
+    def forward_fuse(self, x):
+        if self.training:
+            qw = self.qweight()
+            w = (qw.round() - qw).detach() + qw
+            # TODO: is this correct?
+            self.conv.weight = 2**self.e * w
+        else:
+            print('not training, skipping quantization')
+        return self.act(self.conv(x))
 
 class Conv(nn.Module):
     # Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)
@@ -684,7 +730,7 @@ class AutoShape(nn.Module):
             p = next(self.model.parameters()) if self.pt else torch.empty(1, device=self.model.device)  # param
             autocast = self.amp and (p.device.type != 'cpu')  # Automatic Mixed Precision (AMP) inference
             if isinstance(ims, torch.Tensor):  # torch
-                with amp.autocast(autocast):
+                with torch.amp.autocast('cuda'):
                     return self.model(ims.to(p.device).type_as(p), augment=augment)  # inference
 
             # Pre-process
@@ -711,7 +757,7 @@ class AutoShape(nn.Module):
             x = np.ascontiguousarray(np.array(x).transpose((0, 3, 1, 2)))  # stack and BHWC to BCHW
             x = torch.from_numpy(x).to(p.device).type_as(p) / 255  # uint8 to fp16/32
 
-        with amp.autocast(autocast):
+        with torch.amp.autocast('cuda'):
             # Inference
             with dt[1]:
                 y = self.model(x, augment=augment)  # forward
