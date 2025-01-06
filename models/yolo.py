@@ -30,7 +30,7 @@ from utils.torch_utils import (fuse_conv_and_bn, initialize_weights, model_info,
                                time_sync)
 
 from utils.anchor import make_center_anchors
-from utils.mask import center_to_corner, find_jaccard_overlap, corner_to_center
+from utils.mask import center_to_corner, find_jaccard_overlap
 
 try:
     import thop  # for FLOPs computation

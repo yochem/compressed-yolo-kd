@@ -2,12 +2,15 @@
 """
 Loss functions
 """
+import functools
 
 import torch
 import torch.nn as nn
 
 from utils.metrics import bbox_iou
 from utils.torch_utils import de_parallel
+
+from models.common import QConv
 
 
 def smooth_BCE(eps=0.1):  # https://github.com/ultralytics/yolov3/issues/238#issuecomment-598028441
@@ -98,6 +101,12 @@ def imitation_loss(teacher, student, mask):
     return diff
 
 
+def compression_loss(model):
+    weight_count = sum(t.numel() for t in model.parameters())
+    Q = functools.reduce(lambda x,y: x+y, [l.qbits() for l in model.modules() if isinstance(l, QConv)], 0.)
+    return Q / weight_count
+
+
 class ComputeLoss:
     sort_obj_iou = False
 
@@ -127,6 +136,7 @@ class ComputeLoss:
         self.nl = m.nl  # number of layers
         self.anchors = m.anchors
         self.device = device
+        self.model = model
 
     def __call__(self, p, targets, teacher=None, student=None, mask=None):  # predictions, targets, model
         lcls = torch.zeros(1, device=self.device)  # class loss
@@ -182,9 +192,12 @@ class ComputeLoss:
         lcls *= self.hyp['cls']
         bs = tobj.shape[0]  # batch size
 
-        lmask = imitation_loss(teacher, student, mask) * 0.01
+        Q = compression_loss(self.model) * 0.05
 
-        return (lbox + lobj + lcls + lmask) * bs, torch.cat((lbox, lobj, lcls)).detach()
+        lmask = imitation_loss(teacher, student, mask) * 0.01
+        lmask += Q
+
+        return (lbox + lobj + lcls + lmask) * bs, torch.cat((lbox, lobj, lcls)).detach(), Q
 
     def build_targets(self, p, targets):
         # Build targets for compute_loss(), input targets(image,class,x,y,w,h)
