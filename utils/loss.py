@@ -120,7 +120,10 @@ def get_all_qbits(model):
 
 def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
-    Q = functools.reduce(lambda x, y: x + y, get_all_qbits(model), 0.0)
+    qbits = get_all_qbits(model)
+    with open('qbits.txt', 'w') as f:
+        f.writelines([qbits]))
+    Q = functools.reduce(lambda x, y: x + y, qbits, 0.0)
     return Q / weight_count
 
 
@@ -233,15 +236,12 @@ class ComputeLoss:
         lcls *= self.hyp["cls"]
         bs = tobj.shape[0]  # batch size
 
-        Q = compression_loss(self.model) * 0.05
-
         lmask = imitation_loss(teacher, student, mask) * 0.01
-        lmask += Q
+        lcomp = compression_loss(self.model) * 0.05
 
         return (
-            (lbox + lobj + lcls + lmask) * bs,
-            torch.cat((lbox, lobj, lcls)).detach(),
-            Q,
+            (lbox + lobj + lcls + lmask + lcomp) * bs,
+            torch.cat((lbox, lobj, lcls, lmask, lcomp)).detach()
         )
 
     def build_targets(self, p, targets):

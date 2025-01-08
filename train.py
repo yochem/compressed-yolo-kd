@@ -46,7 +46,6 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 import val as validate  # for end-of-epoch mAP
-from models.common import QConv
 from models.experimental import attempt_load
 from models.yolo import Model
 from utils.autoanchor import check_anchors
@@ -426,8 +425,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             nn.ReLU(),
         ).to(device)
 
-    LOGGER.warn(f'num qconvs: {QConv.count}')
-
     for epoch in range(
         start_epoch, epochs
     ):  # epoch ------------------------------------------------------------------
@@ -452,18 +449,22 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
         # dataset.mosaic_border = [b - imgsz, -b]  # height, width borders
 
-        mloss = torch.zeros(3, device=device)  # mean losses
+        # mloss = torch.zeros(3, device=device)  # mean losses
+        # account for mask loss and compression loss
+        mloss = torch.zeros(5, device=device)  # mean losses
         if RANK != -1:
             train_loader.sampler.set_epoch(epoch)
         pbar = enumerate(train_loader)
         LOGGER.info(
-            ("\n" + "%11s" * 8)
+            ("\n" + "%11s" * 10)
             % (
                 "Epoch",
                 "GPU_mem",
                 "box_loss",
                 "obj_loss",
                 "cls_loss",
+                "msk_loss",
+                "cmp_loss",
                 "Instances",
                 "Size",
                 "Bytes",
@@ -473,7 +474,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             pbar = tqdm(pbar, total=nb, bar_format=TQDM_BAR_FORMAT)  # progress bar
         optimizer.zero_grad()
         weight_count = sum(t.numel() for t in model.parameters())
-        bytes_per_epoch = []
         for i, (
             imgs,
             targets,
@@ -529,7 +529,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 if opt.teacher_weight:
                     pred, features, _ = model(imgs, target=targets)  # forward
                     _, teacher_feature, mask = teacher_model(imgs, target=targets)
-                    loss, loss_items, Q = compute_loss(
+                    loss, loss_items = compute_loss(
                         pred,
                         targets,
                         teacher_feature.detach(),
@@ -538,7 +538,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     )  # loss scaled by batch_size
                 else:
                     pred = model(imgs)  # forward
-                    loss, loss_items, Q = compute_loss(
+                    loss, loss_items = compute_loss(
                         pred, targets
                     )  # loss scaled by batch_size
 
@@ -565,12 +565,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
             # Log
             if RANK in {-1, 0}:
-                modelbytes = Q / 8 * weight_count
-                bytes_per_epoch.append(modelbytes)
+                modelbytes = loss_items[-1] / 8 * weight_count
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
                 pbar.set_description(
-                    ("%11s" * 2 + ("%11.4g" * 5) + "%11d")
+                    ("%11s" * 2 + ("%11.4g" * 7) + "%11d")
                     % (
                         f"{epoch}/{epochs - 1}",
                         mem,
@@ -697,7 +696,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                         )
 
         callbacks.run("on_train_end", last, best, epoch, results)
-        print("BYTES_PER_EPOCH:", *bytes_per_epoch, sep="\n")
 
     torch.cuda.empty_cache()
     return results
