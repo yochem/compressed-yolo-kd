@@ -6,13 +6,13 @@ EPOCHS=30
 . ../venv/bin/activate
 
 usage() {
-	[ -n $1 ] && { echo "$1"; echo }
+	[ -n "$1" ] && { echo "$1"; echo ""; }
 	echo "Usage: $0 <command> [args]"
 	echo "Commands:"
-	echo "	export <model>"
-	echo "	kd <name>"
-	echo "	single <name>"
-	echo "	val <model>"
+	echo "  export <model>"
+	echo "  kd <name>"
+	echo "  single <name>"
+	echo "  val <model>"
 	exit 1
 }
 
