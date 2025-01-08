@@ -1178,6 +1178,7 @@ class Classify(nn.Module):
     def forward(self, x):
         if isinstance(x, list):
             x = torch.cat(x, 1)
+        return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
 
 
 
@@ -1185,12 +1186,9 @@ class Classify(nn.Module):
 ### QUANTIZED LAYERS ###
 ########################
 
-class QConv(nn.Module):
-   # Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)
-   default_act = nn.SiLU()  # default activation
-
+class QConv(Conv):
    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
-       super().__init__()
+       super().__init__(c1, c2, k, s, p, g, d, act)
        self.conv = nn.Conv2d(
            c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False
        )
@@ -1221,9 +1219,9 @@ class QConv(nn.Module):
            self.conv.weight = torch.nn.Parameter(qd)
 
    def forward(self, x):
-       # self.quantize_conv_weights()
-       return self.act(self.bn(self.conv(x)))
+       self._quantize_conv_weights()
+       return super().forward(x)
 
    def forward_fuse(self, x):
-       # self.quantize_conv_weights()
-       return self.act(self.conv(x))       return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
+       self._quantize_conv_weights()
+       return super().forward_fuse(x)
