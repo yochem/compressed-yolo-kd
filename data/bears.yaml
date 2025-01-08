@@ -1,0 +1,9 @@
+path: ../datasets/daynight-color
+train: train/images
+val: val/images
+test: test/images
+
+names:
+  0: bear
+
+download:
