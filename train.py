@@ -46,6 +46,7 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 import val as validate  # for end-of-epoch mAP
+from models.common import QConv
 from models.experimental import attempt_load
 from models.yolo import Model
 from utils.autoanchor import check_anchors
@@ -424,6 +425,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             ),
             nn.ReLU(),
         ).to(device)
+
+    LOGGER.warn(f'num qconvs: {QConv.count})
 
     for epoch in range(
         start_epoch, epochs

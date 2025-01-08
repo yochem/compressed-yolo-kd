@@ -1208,35 +1208,38 @@ class Classify(nn.Module):
 ########################
 
 class QConv(Conv):
-   def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
-       super().__init__(c1, c2, k, s, p, g, d, act)
-       self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
-       self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 2.0))
+    count = 0
 
-   def qbits(self):
-       return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
+        super().__init__(c1, c2, k, s, p, g, d, act)
+        self.count += 1
+        self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
+        self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 2.0))
 
-   def qweight(self):
-       return torch.minimum(
-           torch.maximum(2**-self.e * self.conv.weight, -(2 ** (F.relu(self.b) - 1))),
-           2 ** (F.relu(self.b) - 1) - 1,
-       )
+    def qbits(self):
+        return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
 
-   def _quantize_conv_weights(self):
-       if self.training:
-           qw = self.qweight()
-           w = (qw.round() - qw).detach() + qw
-           qd = 2**self.e * w
-           assert self.conv.weight.shape == qd.shape
-           self.conv.weight = torch.nn.Parameter(qd)
+    def qweight(self):
+        return torch.minimum(
+            torch.maximum(2**-self.e * self.conv.weight, -(2 ** (F.relu(self.b) - 1))),
+            2 ** (F.relu(self.b) - 1) - 1,
+        )
 
-   def forward(self, x):
-       self._quantize_conv_weights()
-       return super().forward(x)
+    def _quantize_conv_weights(self):
+        if self.training:
+            qw = self.qweight()
+            w = (qw.round() - qw).detach() + qw
+            qd = 2**self.e * w
+            assert self.conv.weight.shape == qd.shape
+            self.conv.weight = torch.nn.Parameter(qd)
 
-   def forward_fuse(self, x):
-       self._quantize_conv_weights()
-       return super().forward_fuse(x)
+    def forward(self, x):
+        self._quantize_conv_weights()
+        return super().forward(x)
+
+    def forward_fuse(self, x):
+        self._quantize_conv_weights()
+        return super().forward_fuse(x)
 
 class QDWConv(QConv):
     # Depth-wise convolution
