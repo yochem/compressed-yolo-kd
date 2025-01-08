@@ -107,8 +107,6 @@ def imitation_loss(teacher, student, mask):
 def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
     qbits = total_qbits(model)
-    with open("qbits.txt", "w") as f:
-        f.writelines([qbits])
     Q = functools.reduce(lambda x, y: x + y, qbits, 0.0)
     return Q / weight_count
 
