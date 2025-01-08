@@ -260,7 +260,7 @@ def run(
         0.0,
     )
     dt = Profile(), Profile(), Profile()  # profiling times
-    loss = torch.zeros(3, device=device)
+    loss = torch.zeros(5, device=device)
     jdict, stats, ap, ap_class = [], [], [], []
     callbacks.run("on_val_start")
     pbar = tqdm(dataloader, desc=s, bar_format=TQDM_BAR_FORMAT)  # progress bar
