@@ -520,7 +520,6 @@ def parse_model(d, ch, get_anchor=False):  # model_dict, input_channels(3)
             nn.ConvTranspose2d,
             DWConvTranspose2d,
             C3x,
-
             QConv,
             QGhostConv,
             QBottleneck,
@@ -562,8 +561,8 @@ def parse_model(d, ch, get_anchor=False):  # model_dict, input_channels(3)
         elif m is Expand:
             c2 = ch[f] // args[0] ** 2
         else:
-            if m.__name__.startswith('Q'):
-                LOGGER.warn(f'uncatched layer: {m}')
+            if m.__name__.startswith("Q"):
+                LOGGER.warn(f"uncatched layer: {m}")
             c2 = ch[f]
 
         m_ = (

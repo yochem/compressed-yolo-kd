@@ -104,6 +104,7 @@ class DWConv(Conv):
 
 class DWConvTranspose2d(nn.ConvTranspose2d):
     convclass = Conv
+
     # Depth-wise transpose convolution
     def __init__(
         self, c1, c2, k=1, s=1, p1=0, p2=0
@@ -113,6 +114,7 @@ class DWConvTranspose2d(nn.ConvTranspose2d):
 
 class TransformerLayer(nn.Module):
     convclass = Conv
+
     # Transformer layer https://arxiv.org/abs/2010.11929 (LayerNorm layers removed for better performance)
     def __init__(self, c, num_heads):
         super().__init__()
@@ -132,6 +134,7 @@ class TransformerLayer(nn.Module):
 class TransformerBlock(nn.Module):
     # Vision Transformer https://arxiv.org/abs/2010.11929
     convclass = Conv
+
     def __init__(self, c1, c2, num_heads, num_layers):
         super().__init__()
         self.conv = None
@@ -154,6 +157,7 @@ class TransformerBlock(nn.Module):
 class Bottleneck(nn.Module):
     # Standard bottleneck
     convclass = Conv
+
     def __init__(
         self, c1, c2, shortcut=True, g=1, e=0.5
     ):  # ch_in, ch_out, shortcut, groups, expansion
@@ -170,6 +174,7 @@ class Bottleneck(nn.Module):
 class BottleneckCSP(nn.Module):
     # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
     convclass = Conv
+
     def __init__(
         self, c1, c2, n=1, shortcut=True, g=1, e=0.5
     ):  # ch_in, ch_out, number, shortcut, groups, expansion
@@ -194,6 +199,7 @@ class BottleneckCSP(nn.Module):
 class CrossConv(nn.Module):
     # Cross Convolution Downsample
     convclass = Conv
+
     def __init__(self, c1, c2, k=3, s=1, g=1, e=1.0, shortcut=False):
         # ch_in, ch_out, kernel, stride, groups, expansion, shortcut
         super().__init__()
@@ -209,6 +215,7 @@ class CrossConv(nn.Module):
 class C3(nn.Module):
     # CSP Bottleneck with 3 convolutions
     convclass = Conv
+
     def __init__(
         self, c1, c2, n=1, shortcut=True, g=1, e=0.5
     ):  # ch_in, ch_out, number, shortcut, groups, expansion
@@ -228,6 +235,7 @@ class C3(nn.Module):
 class C3x(C3):
     # C3 module with cross-convolutions
     convclass = Conv
+
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
         c_ = int(c2 * e)
@@ -239,6 +247,7 @@ class C3x(C3):
 class C3TR(C3):
     # C3 module with TransformerBlock()
     convclass = Conv
+
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
         c_ = int(c2 * e)
@@ -247,6 +256,7 @@ class C3TR(C3):
 
 class C3SPP(C3):
     convclass = Conv
+
     # C3 module with SPP()
     def __init__(self, c1, c2, k=(5, 9, 13), n=1, shortcut=True, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
@@ -256,6 +266,7 @@ class C3SPP(C3):
 
 class C3Ghost(C3):
     convclass = Conv
+
     # C3 module with GhostBottleneck()
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
@@ -265,6 +276,7 @@ class C3Ghost(C3):
 
 class SPP(nn.Module):
     convclass = Conv
+
     # Spatial Pyramid Pooling (SPP) layer https://arxiv.org/abs/1406.4729
     def __init__(self, c1, c2, k=(5, 9, 13)):
         super().__init__()
@@ -284,6 +296,7 @@ class SPP(nn.Module):
 
 class SPPF(nn.Module):
     convclass = Conv
+
     # Spatial Pyramid Pooling - Fast (SPPF) layer for YOLOv5 by Glenn Jocher
     def __init__(self, c1, c2, k=5):  # equivalent to SPP(k=(5, 9, 13))
         super().__init__()
@@ -303,6 +316,7 @@ class SPPF(nn.Module):
 
 class Focus(nn.Module):
     convclass = Conv
+
     # Focus wh information into c-space
     def __init__(
         self, c1, c2, k=1, s=1, p=None, g=1, act=True
@@ -328,6 +342,7 @@ class Focus(nn.Module):
 
 class GhostConv(nn.Module):
     convclass = Conv
+
     # Ghost Convolution https://github.com/huawei-noah/ghostnet
     def __init__(
         self, c1, c2, k=1, s=1, g=1, act=True
@@ -344,6 +359,7 @@ class GhostConv(nn.Module):
 
 class GhostBottleneck(nn.Module):
     convclass = Conv
+
     # Ghost Bottleneck https://github.com/huawei-noah/ghostnet
     def __init__(self, c1, c2, k=3, s=1):  # ch_in, ch_out, kernel, stride
         super().__init__()
@@ -367,6 +383,7 @@ class GhostBottleneck(nn.Module):
 
 class Contract(nn.Module):
     convclass = Conv
+
     # Contract width-height into channels, i.e. x(1,64,80,80) to x(1,256,40,40)
     def __init__(self, gain=2):
         super().__init__()
@@ -384,6 +401,7 @@ class Contract(nn.Module):
 
 class Expand(nn.Module):
     convclass = Conv
+
     # Expand channels into width-height, i.e. x(1,64,80,80) to x(1,16,160,160)
     def __init__(self, gain=2):
         super().__init__()
@@ -399,6 +417,7 @@ class Expand(nn.Module):
 
 class Concat(nn.Module):
     convclass = Conv
+
     # Concatenate a list of tensors along dimension
     def __init__(self, dimension=1):
         super().__init__()
@@ -410,6 +429,7 @@ class Concat(nn.Module):
 
 class DetectMultiBackend(nn.Module):
     convclass = Conv
+
     # YOLOv5 MultiBackend class for python inference on various backends
     def __init__(
         self,
@@ -991,6 +1011,7 @@ class AutoShape(nn.Module):
 
 class Detections:
     convclass = Conv
+
     # YOLOv5 detections class for inference results
     def __init__(self, ims, pred, files, times=(0, 0, 0), names=None, shape=None):
         super().__init__()
@@ -1171,6 +1192,7 @@ class Detections:
 
 class Proto(nn.Module):
     convclass = Conv
+
     # YOLOv5 mask Proto module for segmentation models
     def __init__(self, c1, c_=256, c2=32):  # ch_in, number of protos, number of masks
         super().__init__()
@@ -1185,6 +1207,7 @@ class Proto(nn.Module):
 
 class Classify(nn.Module):
     convclass = Conv
+
     # YOLOv5 classification head, i.e. x(b,c1,20,20) to x(b,c2)
     def __init__(
         self, c1, c2, k=1, s=1, p=None, g=1, dropout_p=0.0
@@ -1202,10 +1225,10 @@ class Classify(nn.Module):
         return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
 
 
-
 ########################
 ### QUANTIZED LAYERS ###
 ########################
+
 
 class QConv(Conv):
     count = 0
@@ -1241,6 +1264,7 @@ class QConv(Conv):
         self._quantize_conv_weights()
         return super().forward_fuse(x)
 
+
 class QDWConv(QConv):
     # Depth-wise convolution
     # ch_in, ch_out, kernel, stride, dilation, activation
@@ -1248,27 +1272,97 @@ class QDWConv(QConv):
         super().__init__(c1, c2, k, s, g=math.gcd(c1, c2), d=d, act=act)
 
 
-class QDWConvTranspose2d(DWConvTranspose2d): convclass = QConv
-class QTransformerLayer(TransformerLayer): convclass = QConv
-class QTransformerBlock(TransformerBlock): convclass = QConv
-class QBottleneck(Bottleneck): convclass = QConv
-class QBottleneckCSP(BottleneckCSP): convclass = QConv
-class QCrossConv(CrossConv): convclass = QConv
-class QC3(C3): convclass = QConv
-class QC3x(C3x): convclass = QConv
-class QC3TR(C3TR): convclass = QConv
-class QC3SPP(C3SPP): convclass = QConv
-class QC3Ghost(C3Ghost): convclass = QConv
-class QSPP(SPP): convclass = QConv
-class QSPPF(SPPF): convclass = QConv
-class QFocus(Focus): convclass = QConv
-class QGhostConv(GhostConv): convclass = QConv
-class QGhostBottleneck(GhostBottleneck): convclass = QConv
-class QContract(Contract): convclass = QConv
-class QExpand(Expand): convclass = QConv
-class QConcat(Concat): convclass = QConv
-class QDetectMultiBackend(DetectMultiBackend): convclass = QConv
-class QAutoShape(AutoShape): convclass = QConv
-class QDetections: convclass = QConv
-class QProto(Proto): convclass = QConv
-class QClassify(Classify): convclass = QConv
+class QDWConvTranspose2d(DWConvTranspose2d):
+    convclass = QConv
+
+
+class QTransformerLayer(TransformerLayer):
+    convclass = QConv
+
+
+class QTransformerBlock(TransformerBlock):
+    convclass = QConv
+
+
+class QBottleneck(Bottleneck):
+    convclass = QConv
+
+
+class QBottleneckCSP(BottleneckCSP):
+    convclass = QConv
+
+
+class QCrossConv(CrossConv):
+    convclass = QConv
+
+
+class QC3(C3):
+    convclass = QConv
+
+
+class QC3x(C3x):
+    convclass = QConv
+
+
+class QC3TR(C3TR):
+    convclass = QConv
+
+
+class QC3SPP(C3SPP):
+    convclass = QConv
+
+
+class QC3Ghost(C3Ghost):
+    convclass = QConv
+
+
+class QSPP(SPP):
+    convclass = QConv
+
+
+class QSPPF(SPPF):
+    convclass = QConv
+
+
+class QFocus(Focus):
+    convclass = QConv
+
+
+class QGhostConv(GhostConv):
+    convclass = QConv
+
+
+class QGhostBottleneck(GhostBottleneck):
+    convclass = QConv
+
+
+class QContract(Contract):
+    convclass = QConv
+
+
+class QExpand(Expand):
+    convclass = QConv
+
+
+class QConcat(Concat):
+    convclass = QConv
+
+
+class QDetectMultiBackend(DetectMultiBackend):
+    convclass = QConv
+
+
+class QAutoShape(AutoShape):
+    convclass = QConv
+
+
+class QDetections:
+    convclass = QConv
+
+
+class QProto(Proto):
+    convclass = QConv
+
+
+class QClassify(Classify):
+    convclass = QConv

@@ -108,7 +108,7 @@ def get_all_qbits(model):
         qbits = []
 
         if isinstance(module, nn.Module):
-            if hasattr(module, 'qbits') and callable(getattr(module, 'qbits')):
+            if hasattr(module, "qbits") and callable(getattr(module, "qbits")):
                 qbits.append(module.qbits())
 
             for child in module.children():
@@ -118,11 +118,12 @@ def get_all_qbits(model):
 
     return recursive_walk(model)
 
+
 def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
     qbits = get_all_qbits(model)
-    with open('qbits.txt', 'w') as f:
-        f.writelines([qbits]))
+    with open("qbits.txt", "w") as f:
+        f.writelines([qbits])
     Q = functools.reduce(lambda x, y: x + y, qbits, 0.0)
     return Q / weight_count
 
@@ -241,7 +242,7 @@ class ComputeLoss:
 
         return (
             (lbox + lobj + lcls + lmask + lcomp) * bs,
-            torch.cat((lbox, lobj, lcls, lmask, lcomp)).detach()
+            torch.cat((lbox, lobj, lcls, lmask, lcomp)).detach(),
         )
 
     def build_targets(self, p, targets):
