@@ -11,8 +11,8 @@ usage() {
 	echo "Usage: $0 <command> [args]"
 	echo "Commands:"
 	echo "  export <model>"
-	echo "  kd <name>"
-	echo "  single <name>"
+	echo "  kd <model> <name>"
+	echo "  single <model> <name>"
 	echo "  val <model>"
 	exit 1
 }
@@ -35,36 +35,36 @@ case "$1" in
 		;;
 
 	kd)
-		[ $# -qt 2 ] && usage "Error: '$1' command requires a name"
-		[ $# -qt 3 ] && usage "Error: '$1' command requires a models/ path"
+		[ $# -qt 2 ] && usage "Error: '$1' command requires a models/ path"
+		[ $# -qt 3 ] && usage "Error: '$1' command requires a name"
 		python train.py \
 			--device 0 \
 			--img-size 320 \
 			--data "$DATA" \
-			--cfg "$3" \
+			--cfg "$2" \
 			--weights '' \
 			--batch-size 128 \
 			--teacher_weight "$MODELDIR/v5m.pt" \
 			--epochs "$EPOCHS" \
 			--exist-ok \
-			--name "$2"
-		cp -f "runs/train/$2/weights/best.pt" "$MODELDIR/$2.pt"
+			--name "$3" && \
+		cp -f "runs/train/$3/weights/best.pt" "$MODELDIR/$3.pt"
 		;;
 
 	single)
-		[ $# -qt 2 ] && usage "Error: '$1' command requires a name"
-		[ $# -qt 3 ] && usage "Error: '$1' command requires a models/ path"
+		[ $# -qt 2 ] && usage "Error: '$1' command requires a models/ path"
+		[ $# -qt 3 ] && usage "Error: '$1' command requires a name"
 		python train.py \
 			--device 0 \
 			--img-size 320 \
 			--data "$DATA" \
-			--cfg "$3" \
+			--cfg "$2" \
 			--weights '' \
 			--batch-size 128 \
 			--epochs "$EPOCHS" \
 			--exist-ok \
-			--name "$2"
-		cp -f "runs/train/$2/weights/best.pt" "$MODELDIR/$2.pt"
+			--name "$3" && \
+		cp -f "runs/train/$3/weights/best.pt" "$MODELDIR/$3.pt"
 		;;
 
 	val)
