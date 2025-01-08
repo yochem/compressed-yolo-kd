@@ -426,7 +426,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             nn.ReLU(),
         ).to(device)
 
-    LOGGER.warn(f'num qconvs: {QConv.count})
+    LOGGER.warn(f'num qconvs: {QConv.count}')
 
     for epoch in range(
         start_epoch, epochs
