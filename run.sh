@@ -35,8 +35,8 @@ case "$1" in
 		;;
 
 	kd)
-		[ $# -qt 2 ] && usage "Error: '$1' command requires a models/ path"
-		[ $# -qt 3 ] && usage "Error: '$1' command requires a name"
+		[ $# -gt 2 ] && usage "Error: '$1' command requires a models/ path"
+		[ $# -gt 3 ] && usage "Error: '$1' command requires a name"
 		python train.py \
 			--device 0 \
 			--img-size 320 \
@@ -52,8 +52,8 @@ case "$1" in
 		;;
 
 	single)
-		[ $# -qt 2 ] && usage "Error: '$1' command requires a models/ path"
-		[ $# -qt 3 ] && usage "Error: '$1' command requires a name"
+		[ $# -gt 2 ] && usage "Error: '$1' command requires a models/ path"
+		[ $# -gt 3 ] && usage "Error: '$1' command requires a name"
 		python train.py \
 			--device 0 \
 			--img-size 320 \
