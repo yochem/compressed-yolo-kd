@@ -103,6 +103,7 @@ class DWConv(Conv):
 
 
 class DWConvTranspose2d(nn.ConvTranspose2d):
+    convclass = Conv
     # Depth-wise transpose convolution
     def __init__(
         self, c1, c2, k=1, s=1, p1=0, p2=0
@@ -111,6 +112,7 @@ class DWConvTranspose2d(nn.ConvTranspose2d):
 
 
 class TransformerLayer(nn.Module):
+    convclass = Conv
     # Transformer layer https://arxiv.org/abs/2010.11929 (LayerNorm layers removed for better performance)
     def __init__(self, c, num_heads):
         super().__init__()
@@ -1208,15 +1210,6 @@ class Classify(nn.Module):
 class QConv(Conv):
    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
        super().__init__(c1, c2, k, s, p, g, d, act)
-       self.conv = nn.Conv2d(
-           c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False
-       )
-       self.bn = nn.BatchNorm2d(c2)
-       self.act = (
-           self.default_act
-           if act is True
-           else act if isinstance(act, nn.Module) else nn.Identity()
-       )
        self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
        self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 2.0))
 
@@ -1252,5 +1245,27 @@ class QDWConv(QConv):
         super().__init__(c1, c2, k, s, g=math.gcd(c1, c2), d=d, act=act)
 
 
-# SKIPPED: uses torch conv
-QDWConvTranspose2d = DWConvTranspose2d
+class QDWConvTranspose2d(DWConvTranspose2d): convclass = Conv
+class QTransformerLayer(TransformerLayer): convclass = Conv
+class QTransformerBlock(TransformerBlock): convclass = Conv
+class QBottleneck(Bottleneck): convclass = Conv
+class QBottleneckCSP(BottleneckCSP): convclass = Conv
+class QCrossConv(CrossConv): convclass = Conv
+class QC3(C3): convclass = Conv
+class QC3x(C3x): convclass = Conv
+class QC3TR(C3TR): convclass = Conv
+class QC3SPP(C3SPP): convclass = Conv
+class QC3Ghost(C3Ghost): convclass = Conv
+class QSPP(SPP): convclass = Conv
+class QSPPF(SPPF): convclass = Conv
+class QFocus(Focus): convclass = Conv
+class QGhostConv(GhostConv): convclass = Conv
+class QGhostBottleneck(GhostBottleneck): convclass = Conv
+class QContract(Contract): convclass = Conv
+class QExpand(Expand): convclass = Conv
+class QConcat(Concat): convclass = Conv
+class QDetectMultiBackend(DetectMultiBackend): convclass = Conv
+class QAutoShape(AutoShape): convclass = Conv
+class QDetections: convclass = Conv
+class QProto(Proto): convclass = Conv
+class QClassify(Classify): convclass = Conv
