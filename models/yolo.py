@@ -532,7 +532,6 @@ def parse_model(d, ch, get_anchor=False):  # model_dict, input_channels(3)
             QSPP,
             QSPPF,
             QDWConv,
-            QMixConv2d,
             QFocus,
             QCrossConv,
             QBottleneckCSP,
@@ -540,7 +539,6 @@ def parse_model(d, ch, get_anchor=False):  # model_dict, input_channels(3)
             QC3TR,
             QC3SPP,
             QC3Ghost,
-            Qnn.ConvTranspose2d,
             QDWConvTranspose2d,
             QC3x,
         }:
