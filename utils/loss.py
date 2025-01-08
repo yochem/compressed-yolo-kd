@@ -103,7 +103,7 @@ def imitation_loss(teacher, student, mask):
     return diff
 
 
-def get_all_qbits(model):
+def total_qbits(model):
     def recursive_walk(module):
         qbits = []
 
@@ -121,7 +121,7 @@ def get_all_qbits(model):
 
 def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
-    qbits = get_all_qbits(model)
+    qbits = total_qbits(model)
     with open("qbits.txt", "w") as f:
         f.writelines([qbits])
     Q = functools.reduce(lambda x, y: x + y, qbits, 0.0)

@@ -20,6 +20,7 @@ import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from utils.general import LOGGER, check_version, colorstr, file_date, git_describe
+from utils.loss import total_qbits
 
 LOCAL_RANK = int(
     os.getenv("LOCAL_RANK", -1)
@@ -400,13 +401,15 @@ def model_info(model, verbose=False, imgsz=640):
     except Exception:
         fs = ""
 
+    n_q = len(total_qbits(model))
+
     name = (
         Path(model.yaml_file).stem.replace("yolov5", "YOLOv5")
         if hasattr(model, "yaml_file")
         else "Model"
     )
     LOGGER.info(
-        f"{name} summary: {len(list(model.modules()))} layers, {n_p} parameters, {n_g} gradients{fs}"
+        f"{name} summary: {len(list(model.modules()))} layers, {n_p} parameters, {n_g} gradients, {n_q} quantizable layers{fs}"
     )
 
 
