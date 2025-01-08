@@ -277,7 +277,8 @@ class Loggers:
                 else (("%20s," * n % tuple(["epoch"] + self.keys)).rstrip(",") + "\n")
             )  # add header
             with open(file, "a") as f:
-                f.write(s + ("%20.5g," * n % tuple([epoch] + vals)).rstrip(",") + "\n")
+                # f.write(s + ("%20.5g," * n % tuple([epoch] + vals)).rstrip(",") + "\n")
+                f.write(s + ','.join(f"{x:20.5g}" for x in [epoch] + vals) + "\n")
 
         if self.tb:
             for k, v in x.items():
