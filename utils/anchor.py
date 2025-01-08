@@ -1,16 +1,24 @@
 import torch
 
 
-def make_center_anchors(anchors_wh, grid_size=80, device='cpu'):
+def make_center_anchors(anchors_wh, grid_size=80, device="cpu"):
 
     grid_arange = torch.arange(grid_size)
-    xx, yy = torch.meshgrid(grid_arange, grid_arange)  # + 0.5  # grid center, [fmsize*fmsize,2]
+    xx, yy = torch.meshgrid(
+        grid_arange, grid_arange
+    )  # + 0.5  # grid center, [fmsize*fmsize,2]
     xy = torch.cat((torch.unsqueeze(xx, -1), torch.unsqueeze(yy, -1)), -1) + 0.5
 
     wh = torch.tensor(anchors_wh)
 
-    xy = xy.view(grid_size, grid_size, 1, 2).expand(grid_size, grid_size, 9, 2).type(torch.float32)  # centor
-    wh = wh.view(1, 1, 9, 2).expand(grid_size, grid_size, 9, 2).type(torch.float32)  # w, h
+    xy = (
+        xy.view(grid_size, grid_size, 1, 2)
+        .expand(grid_size, grid_size, 9, 2)
+        .type(torch.float32)
+    )  # centor
+    wh = (
+        wh.view(1, 1, 9, 2).expand(grid_size, grid_size, 9, 2).type(torch.float32)
+    )  # w, h
     center_anchors = torch.cat([xy, wh], dim=3).to(device)
     # cy cx w h
 
