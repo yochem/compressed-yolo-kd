@@ -220,7 +220,7 @@ class ComputeLoss:
         lcls *= self.hyp["cls"]
         bs = tobj.shape[0]  # batch size
 
-        lmask = torch.Tensor([imitation_loss(teacher, student, mask) * 0.01]).to(self.model.device)
+        lmask = torch.Tensor([imitation_loss(teacher, student, mask) * 0.01]).to('cuda')
         lcomp = compression_loss(self.model) * 0.05
 
         print(lbox.shape, lobj.shape, lcls.shape, lmask.shape, lcomp.shape)
