@@ -103,13 +103,24 @@ def imitation_loss(teacher, student, mask):
     return diff
 
 
+def get_all_qbits(model):
+    def recursive_walk(module):
+        qbits = []
+
+        if isinstance(module, nn.Module):
+            if hasattr(module, 'qbits') and callable(getattr(module, 'qbits')):
+                qbits.append(module.qbits())
+
+            for child in module.children():
+                qbits.extend(recursive_walk(child))
+
+        return qbits
+
+    return recursive_walk(model)
+
 def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
-    Q = functools.reduce(
-        lambda x, y: x + y,
-        [l.qbits() for l in model.modules() if hasattr(l, 'qbits')],
-        0.0,
-    )
+    Q = functools.reduce(lambda x, y: x + y, get_all_qbits(model), 0.0)
     return Q / weight_count
 
 
