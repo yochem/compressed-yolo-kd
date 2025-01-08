@@ -71,48 +71,7 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
     return p
 
 
-class QConv(nn.Module):
-    # Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)
-    default_act = nn.SiLU()  # default activation
 
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
-        super().__init__()
-        self.conv = nn.Conv2d(
-            c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False
-        )
-        self.bn = nn.BatchNorm2d(c2)
-        self.act = (
-            self.default_act
-            if act is True
-            else act if isinstance(act, nn.Module) else nn.Identity()
-        )
-        self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
-        self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 2.0))
-
-    def qbits(self):
-        return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
-
-    def qweight(self):
-        return torch.minimum(
-            torch.maximum(2**-self.e * self.conv.weight, -(2 ** (F.relu(self.b) - 1))),
-            2 ** (F.relu(self.b) - 1) - 1,
-        )
-
-    def quantize_conv_weights(self):
-        if self.training:
-            qw = self.qweight()
-            w = (qw.round() - qw).detach() + qw
-            qd = 2**self.e * w
-            assert self.conv.weight.shape == qd.shape
-            self.conv.weight = torch.nn.Parameter(qd)
-
-    def forward(self, x):
-        # self.quantize_conv_weights()
-        return self.act(self.bn(self.conv(x)))
-
-    def forward_fuse(self, x):
-        # self.quantize_conv_weights()
-        return self.act(self.conv(x))
 
 
 class Conv(nn.Module):
@@ -1219,4 +1178,52 @@ class Classify(nn.Module):
     def forward(self, x):
         if isinstance(x, list):
             x = torch.cat(x, 1)
-        return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
+
+
+
+########################
+### QUANTIZED LAYERS ###
+########################
+
+class QConv(nn.Module):
+   # Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)
+   default_act = nn.SiLU()  # default activation
+
+   def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
+       super().__init__()
+       self.conv = nn.Conv2d(
+           c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False
+       )
+       self.bn = nn.BatchNorm2d(c2)
+       self.act = (
+           self.default_act
+           if act is True
+           else act if isinstance(act, nn.Module) else nn.Identity()
+       )
+       self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
+       self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 2.0))
+
+   def qbits(self):
+       return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
+
+   def qweight(self):
+       return torch.minimum(
+           torch.maximum(2**-self.e * self.conv.weight, -(2 ** (F.relu(self.b) - 1))),
+           2 ** (F.relu(self.b) - 1) - 1,
+       )
+
+   def quantize_conv_weights(self):
+       if self.training:
+           qw = self.qweight()
+           w = (qw.round() - qw).detach() + qw
+           qd = 2**self.e * w
+           assert self.conv.weight.shape == qd.shape
+           self.conv.weight = torch.nn.Parameter(qd)
+
+   def forward(self, x):
+       # self.quantize_conv_weights()
+       return self.act(self.bn(self.conv(x)))
+
+   def forward_fuse(self, x):
+       # self.quantize_conv_weights()
+       return self.act(self.conv(x))       return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))

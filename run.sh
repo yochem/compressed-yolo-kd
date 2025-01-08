@@ -40,7 +40,7 @@ case "$1" in
 			--device 0 \
 			--img-size 320 \
 			--data "$DATA" \
-			--cfg data/Qyolov5n.yaml \
+			--cfg models/Qyolov5n.yaml \
 			--weights '' \
 			--batch-size 128 \
 			--teacher_weight "$MODELDIR/v5m.pt" \
