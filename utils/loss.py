@@ -9,6 +9,7 @@ import torch.nn as nn
 
 from utils.metrics import bbox_iou
 from utils.torch_utils import de_parallel
+from utils.quant import total_qbits
 
 
 def smooth_BCE(
@@ -101,22 +102,6 @@ def imitation_loss(teacher, student, mask):
     diff = diff.sum() / mask.sum() / 2
 
     return diff
-
-
-def total_qbits(model):
-    def recursive_walk(module):
-        qbits = []
-
-        if isinstance(module, nn.Module):
-            if hasattr(module, "qbits") and callable(getattr(module, "qbits")):
-                qbits.append(module.qbits())
-
-            for child in module.children():
-                qbits.extend(recursive_walk(child))
-
-        return qbits
-
-    return recursive_walk(model)
 
 
 def compression_loss(model):

@@ -20,7 +20,7 @@ import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from utils.general import LOGGER, check_version, colorstr, file_date, git_describe
-from utils.loss import total_qbits
+from utils.quant import total_qbits
 
 LOCAL_RANK = int(
     os.getenv("LOCAL_RANK", -1)
