@@ -1222,7 +1222,7 @@ class QConv(Conv):
            2 ** (F.relu(self.b) - 1) - 1,
        )
 
-   def quantize_conv_weights(self):
+   def _quantize_conv_weights(self):
        if self.training:
            qw = self.qweight()
            w = (qw.round() - qw).detach() + qw
