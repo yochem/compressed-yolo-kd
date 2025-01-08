@@ -35,12 +35,13 @@ case "$1" in
 		;;
 
 	kd)
-		[ $# -ne 2 ] && usage "Error: '$1' command requires a name argument."
+		[ $# -qt 2 ] && usage "Error: '$1' command requires a name"
+		[ $# -qt 3 ] && usage "Error: '$1' command requires a models/ path"
 		python train.py \
 			--device 0 \
 			--img-size 320 \
 			--data "$DATA" \
-			--cfg models/Qyolov5n.yaml \
+			--cfg "$3" \
 			--weights '' \
 			--batch-size 128 \
 			--teacher_weight "$MODELDIR/v5m.pt" \
@@ -51,13 +52,13 @@ case "$1" in
 		;;
 
 	single)
-		[ $# -lt 2 ] && usage "Error: '$1' command requires a name argument."
-		[ $# -lt 3 ] && usage "Error: '$1' command requires a model argument."
+		[ $# -qt 2 ] && usage "Error: '$1' command requires a name"
+		[ $# -qt 3 ] && usage "Error: '$1' command requires a models/ path"
 		python train.py \
 			--device 0 \
 			--img-size 320 \
 			--data "$DATA" \
-			--cfg $3 \
+			--cfg "$3" \
 			--weights '' \
 			--batch-size 128 \
 			--epochs "$EPOCHS" \
