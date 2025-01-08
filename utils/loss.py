@@ -96,7 +96,7 @@ class QFocalLoss(nn.Module):
 
 def imitation_loss(teacher, student, mask):
     if student is None or teacher is None:
-        return torch.Tensor([0.]).to(student.device)
+        return 0.
     # print(teacher.shape, student.shape, mask.shape)
     diff = torch.pow(student - teacher, 2) * mask
     diff = diff.sum() / mask.sum() / 2
@@ -220,7 +220,7 @@ class ComputeLoss:
         lcls *= self.hyp["cls"]
         bs = tobj.shape[0]  # batch size
 
-        lmask = imitation_loss(teacher, student, mask) * 0.01
+        lmask = torch.Tensor(imitation_loss(teacher, student, mask) * 0.01).to(self.model.device)
         lcomp = compression_loss(self.model) * 0.05
 
         print(lbox.shape, lobj.shape, lcls.shape, lmask.shape, lcomp.shape)
