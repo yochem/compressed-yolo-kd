@@ -107,7 +107,7 @@ def imitation_loss(teacher, student, mask):
 def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
     qbits = total_qbits(model)
-    Q = functools.reduce(lambda x, y: x + y, qbits, Torch.Tensor([0.0]))
+    Q = functools.reduce(lambda x, y: x + y, qbits, torch.Tensor([0.0]))
     return Q / weight_count
 
 
