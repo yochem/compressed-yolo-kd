@@ -80,6 +80,7 @@ class Conv(nn.Module):
         self.conv = nn.Conv2d(
             c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False
         )
+        self.weight = self.conv.weight
         self.bn = nn.BatchNorm2d(c2)
         self.act = (
             self.default_act
@@ -1236,15 +1237,16 @@ class QConv(Conv):
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__(c1, c2, k, s, p, g, d, act)
         self.__class__.count += 1
+        self.weight = nn.Parameter(self.conv.weight)
         self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
         self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 2.0))
 
     def qbits(self):
-        return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
+        return F.relu(self.b).sum() * math.prod(self.weight.shape[1:])
 
     def qweight(self):
         return torch.minimum(
-            torch.maximum(2**-self.e * self.conv.weight, -(2 ** (F.relu(self.b) - 1))),
+            torch.maximum(2**-self.e * self.weight, -(2 ** (F.relu(self.b) - 1))),
             2 ** (F.relu(self.b) - 1) - 1,
         )
 
@@ -1253,8 +1255,8 @@ class QConv(Conv):
             qw = self.qweight()
             w = (qw.round() - qw).detach() + qw
             qd = 2**self.e * w
-            assert self.conv.weight.shape == qd.shape
-            self.conv.weight = torch.nn.Parameter(qd)
+            # assert self.weight.shape == qd.shape
+            # self.weight = torch.nn.Parameter(qd)
 
     def forward(self, x):
         self._quantize_conv_weights()
