@@ -194,7 +194,7 @@ class BaseModel(nn.Module):
     def fuse(self):  # fuse model Conv2d() + BatchNorm2d() layers
         LOGGER.info("Fusing layers... ")
         for m in self.model.modules():
-            if isinstance(m, (Conv, DWConv, QConv)) and hasattr(m, "bn"):
+            if isinstance(m, (Conv, DWConv, QConv, QDWConv)) and hasattr(m, "bn"):
                 m.conv = fuse_conv_and_bn(m.conv, m.bn)  # update conv
                 delattr(m, "bn")  # remove batchnorm
                 m.forward = m.forward_fuse  # update forward
@@ -497,12 +497,15 @@ def parse_model(d, ch, get_anchor=False):  # model_dict, input_channels(3)
     ):  # from, number, module, args
         m = eval(m) if isinstance(m, str) else m  # eval strings
         for j, a in enumerate(args):
-            with contextlib.suppress(NameError):
+            try:
                 args[j] = eval(a) if isinstance(a, str) else a  # eval strings
+            except NameError:
+                LOGGER.warn(f"Can't parse layer {a}!!!")
+            # with contextlib.suppress(NameError):
+            #     args[j] = eval(a) if isinstance(a, str) else a  # eval strings
 
         n = n_ = max(round(n * gd), 1) if n > 1 else n  # depth gain
         if m in {
-            QConv,
             Conv,
             GhostConv,
             Bottleneck,
@@ -521,6 +524,25 @@ def parse_model(d, ch, get_anchor=False):  # model_dict, input_channels(3)
             nn.ConvTranspose2d,
             DWConvTranspose2d,
             C3x,
+
+            QConv,
+            QGhostConv,
+            QBottleneck,
+            QGhostBottleneck,
+            QSPP,
+            QSPPF,
+            QDWConv,
+            QMixConv2d,
+            QFocus,
+            QCrossConv,
+            QBottleneckCSP,
+            QC3,
+            QC3TR,
+            QC3SPP,
+            QC3Ghost,
+            Qnn.ConvTranspose2d,
+            QDWConvTranspose2d,
+            QC3x,
         }:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
