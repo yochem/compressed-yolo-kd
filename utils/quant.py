@@ -1,3 +1,5 @@
+from torch import nn
+
 def total_qbits(model):
     def recursive_walk(module):
         qbits = []
