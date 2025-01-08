@@ -221,7 +221,7 @@ class ComputeLoss:
         bs = tobj.shape[0]  # batch size
 
         lmask = torch.tensor([imitation_loss(teacher, student, mask) * 0.01], device=self.device)
-        lcomp = compression_loss(self.model) * 0.0
+        lcomp = compression_loss(self.model) * 0.005
 
         return (
             (lbox + lobj + lcls + lmask + lcomp) * bs,
