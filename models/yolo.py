@@ -562,6 +562,7 @@ def parse_model(d, ch, get_anchor=False):  # model_dict, input_channels(3)
         elif m is Expand:
             c2 = ch[f] // args[0] ** 2
         else:
+            LOGGER.warn(f'unknown layer: {m}')
             c2 = ch[f]
 
         m_ = (
