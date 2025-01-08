@@ -10,8 +10,6 @@ import torch.nn as nn
 from utils.metrics import bbox_iou
 from utils.torch_utils import de_parallel
 
-from models.common import QConv
-
 
 def smooth_BCE(
     eps=0.1,
@@ -109,7 +107,7 @@ def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
     Q = functools.reduce(
         lambda x, y: x + y,
-        [l.qbits() for l in model.modules() if isinstance(l, QConv)],
+        [l.qbits() for l in model.modules() if hasattr(l, 'qbits')],
         0.0,
     )
     return Q / weight_count
