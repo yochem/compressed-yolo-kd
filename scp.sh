@@ -1,8 +1,13 @@
-set -o nounset
+#!/usr/bin/env bash
 
-for file in "$@"; do
-	gcloud compute scp $file "Yochem@cpu8gpu2:~/yolokd/repo/$file" --project "afstuderen-yochem" --recurse --zone "europe-west4-c"
+changed=$(git status --porcelain | cut -c 4-)
+
+scp_path="Yochem@cpu8gpu2:~/yolokd/compressed-yol-kd"
+
+for file in $changed; do
+	echo "Copying $file"
+	gcloud compute scp "$file" "$scp_path/$file" --recurse --zone "europe-west4-c"
+	git add "$file"
 done
 
-git add $@
 git commit -m "scp to server" >/dev/null
