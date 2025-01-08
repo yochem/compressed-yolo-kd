@@ -105,10 +105,9 @@ def imitation_loss(teacher, student, mask):
 
 
 def compression_loss(model):
-    device = next(model.parameters()).device  # get model device
     weight_count = sum(t.numel() for t in model.parameters())
     qbits = total_qbits(model)
-    Q = functools.reduce(lambda x, y: x + y, qbits, torch.tensor([0.0], device=device))
+    Q = functools.reduce(lambda x, y: x + y, qbits, torch.tensor([0.0], device='cuda'))
     return Q / weight_count
 
 
@@ -221,10 +220,8 @@ class ComputeLoss:
         lcls *= self.hyp["cls"]
         bs = tobj.shape[0]  # batch size
 
-        lmask = torch.Tensor([imitation_loss(teacher, student, mask) * 0.01]).to('cuda')
+        lmask = torch.tensor([imitation_loss(teacher, student, mask) * 0.01], device=self.device)
         lcomp = compression_loss(self.model) * 0.05
-
-        print(lbox.shape, lobj.shape, lcls.shape, lmask.shape, lcomp.shape)
 
         return (
             (lbox + lobj + lcls + lmask + lcomp) * bs,
