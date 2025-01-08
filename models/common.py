@@ -71,9 +71,6 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
     return p
 
 
-
-
-
 class Conv(nn.Module):
     # Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)
     default_act = nn.SiLU()  # default activation
@@ -132,11 +129,12 @@ class TransformerLayer(nn.Module):
 
 class TransformerBlock(nn.Module):
     # Vision Transformer https://arxiv.org/abs/2010.11929
+    convclass = Conv
     def __init__(self, c1, c2, num_heads, num_layers):
         super().__init__()
         self.conv = None
         if c1 != c2:
-            self.conv = Conv(c1, c2)
+            self.conv = self.convclass(c1, c2)
         self.linear = nn.Linear(c2, c2)  # learnable position embedding
         self.tr = nn.Sequential(
             *(TransformerLayer(c2, num_heads) for _ in range(num_layers))
@@ -153,13 +151,14 @@ class TransformerBlock(nn.Module):
 
 class Bottleneck(nn.Module):
     # Standard bottleneck
+    convclass = Conv
     def __init__(
         self, c1, c2, shortcut=True, g=1, e=0.5
     ):  # ch_in, ch_out, shortcut, groups, expansion
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
-        self.cv1 = Conv(c1, c_, 1, 1)
-        self.cv2 = Conv(c_, c2, 3, 1, g=g)
+        self.cv1 = self.convclass(c1, c_, 1, 1)
+        self.cv2 = self.convclass(c_, c2, 3, 1, g=g)
         self.add = shortcut and c1 == c2
 
     def forward(self, x):
@@ -168,15 +167,16 @@ class Bottleneck(nn.Module):
 
 class BottleneckCSP(nn.Module):
     # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
+    convclass = Conv
     def __init__(
         self, c1, c2, n=1, shortcut=True, g=1, e=0.5
     ):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
-        self.cv1 = Conv(c1, c_, 1, 1)
+        self.cv1 = self.convclass(c1, c_, 1, 1)
         self.cv2 = nn.Conv2d(c1, c_, 1, 1, bias=False)
         self.cv3 = nn.Conv2d(c_, c_, 1, 1, bias=False)
-        self.cv4 = Conv(2 * c_, c2, 1, 1)
+        self.cv4 = self.convclass(2 * c_, c2, 1, 1)
         self.bn = nn.BatchNorm2d(2 * c_)  # applied to cat(cv2, cv3)
         self.act = nn.SiLU()
         self.m = nn.Sequential(
@@ -191,12 +191,13 @@ class BottleneckCSP(nn.Module):
 
 class CrossConv(nn.Module):
     # Cross Convolution Downsample
+    convclass = Conv
     def __init__(self, c1, c2, k=3, s=1, g=1, e=1.0, shortcut=False):
         # ch_in, ch_out, kernel, stride, groups, expansion, shortcut
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
-        self.cv1 = Conv(c1, c_, (1, k), (1, s))
-        self.cv2 = Conv(c_, c2, (k, 1), (s, 1), g=g)
+        self.cv1 = self.convclass(c1, c_, (1, k), (1, s))
+        self.cv2 = self.convclass(c_, c2, (k, 1), (s, 1), g=g)
         self.add = shortcut and c1 == c2
 
     def forward(self, x):
@@ -205,14 +206,15 @@ class CrossConv(nn.Module):
 
 class C3(nn.Module):
     # CSP Bottleneck with 3 convolutions
+    convclass = Conv
     def __init__(
         self, c1, c2, n=1, shortcut=True, g=1, e=0.5
     ):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
-        self.cv1 = Conv(c1, c_, 1, 1)
-        self.cv2 = Conv(c1, c_, 1, 1)
-        self.cv3 = Conv(2 * c_, c2, 1)  # optional act=FReLU(c2)
+        self.cv1 = self.convclass(c1, c_, 1, 1)
+        self.cv2 = self.convclass(c1, c_, 1, 1)
+        self.cv3 = self.convclass(2 * c_, c2, 1)  # optional act=FReLU(c2)
         self.m = nn.Sequential(
             *(Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n))
         )
@@ -223,6 +225,7 @@ class C3(nn.Module):
 
 class C3x(C3):
     # C3 module with cross-convolutions
+    convclass = Conv
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
         c_ = int(c2 * e)
@@ -233,6 +236,7 @@ class C3x(C3):
 
 class C3TR(C3):
     # C3 module with TransformerBlock()
+    convclass = Conv
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
         c_ = int(c2 * e)
@@ -240,6 +244,7 @@ class C3TR(C3):
 
 
 class C3SPP(C3):
+    convclass = Conv
     # C3 module with SPP()
     def __init__(self, c1, c2, k=(5, 9, 13), n=1, shortcut=True, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
@@ -248,6 +253,7 @@ class C3SPP(C3):
 
 
 class C3Ghost(C3):
+    convclass = Conv
     # C3 module with GhostBottleneck()
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
@@ -256,12 +262,13 @@ class C3Ghost(C3):
 
 
 class SPP(nn.Module):
+    convclass = Conv
     # Spatial Pyramid Pooling (SPP) layer https://arxiv.org/abs/1406.4729
     def __init__(self, c1, c2, k=(5, 9, 13)):
         super().__init__()
         c_ = c1 // 2  # hidden channels
-        self.cv1 = Conv(c1, c_, 1, 1)
-        self.cv2 = Conv(c_ * (len(k) + 1), c2, 1, 1)
+        self.cv1 = self.convclass(c1, c_, 1, 1)
+        self.cv2 = self.convclass(c_ * (len(k) + 1), c2, 1, 1)
         self.m = nn.ModuleList(
             [nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k]
         )
@@ -274,12 +281,13 @@ class SPP(nn.Module):
 
 
 class SPPF(nn.Module):
+    convclass = Conv
     # Spatial Pyramid Pooling - Fast (SPPF) layer for YOLOv5 by Glenn Jocher
     def __init__(self, c1, c2, k=5):  # equivalent to SPP(k=(5, 9, 13))
         super().__init__()
         c_ = c1 // 2  # hidden channels
-        self.cv1 = Conv(c1, c_, 1, 1)
-        self.cv2 = Conv(c_ * 4, c2, 1, 1)
+        self.cv1 = self.convclass(c1, c_, 1, 1)
+        self.cv2 = self.convclass(c_ * 4, c2, 1, 1)
         self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
 
     def forward(self, x):
@@ -292,12 +300,13 @@ class SPPF(nn.Module):
 
 
 class Focus(nn.Module):
+    convclass = Conv
     # Focus wh information into c-space
     def __init__(
         self, c1, c2, k=1, s=1, p=None, g=1, act=True
     ):  # ch_in, ch_out, kernel, stride, padding, groups
         super().__init__()
-        self.conv = Conv(c1 * 4, c2, k, s, p, g, act=act)
+        self.conv = self.convclass(c1 * 4, c2, k, s, p, g, act=act)
         # self.contract = Contract(gain=2)
 
     def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
@@ -316,14 +325,15 @@ class Focus(nn.Module):
 
 
 class GhostConv(nn.Module):
+    convclass = Conv
     # Ghost Convolution https://github.com/huawei-noah/ghostnet
     def __init__(
         self, c1, c2, k=1, s=1, g=1, act=True
     ):  # ch_in, ch_out, kernel, stride, groups
         super().__init__()
         c_ = c2 // 2  # hidden channels
-        self.cv1 = Conv(c1, c_, k, s, None, g, act=act)
-        self.cv2 = Conv(c_, c_, 5, 1, None, c_, act=act)
+        self.cv1 = self.convclass(c1, c_, k, s, None, g, act=act)
+        self.cv2 = self.convclass(c_, c_, 5, 1, None, c_, act=act)
 
     def forward(self, x):
         y = self.cv1(x)
@@ -331,6 +341,7 @@ class GhostConv(nn.Module):
 
 
 class GhostBottleneck(nn.Module):
+    convclass = Conv
     # Ghost Bottleneck https://github.com/huawei-noah/ghostnet
     def __init__(self, c1, c2, k=3, s=1):  # ch_in, ch_out, kernel, stride
         super().__init__()
@@ -353,6 +364,7 @@ class GhostBottleneck(nn.Module):
 
 
 class Contract(nn.Module):
+    convclass = Conv
     # Contract width-height into channels, i.e. x(1,64,80,80) to x(1,256,40,40)
     def __init__(self, gain=2):
         super().__init__()
@@ -369,6 +381,7 @@ class Contract(nn.Module):
 
 
 class Expand(nn.Module):
+    convclass = Conv
     # Expand channels into width-height, i.e. x(1,64,80,80) to x(1,16,160,160)
     def __init__(self, gain=2):
         super().__init__()
@@ -383,6 +396,7 @@ class Expand(nn.Module):
 
 
 class Concat(nn.Module):
+    convclass = Conv
     # Concatenate a list of tensors along dimension
     def __init__(self, dimension=1):
         super().__init__()
@@ -393,6 +407,7 @@ class Concat(nn.Module):
 
 
 class DetectMultiBackend(nn.Module):
+    convclass = Conv
     # YOLOv5 MultiBackend class for python inference on various backends
     def __init__(
         self,
@@ -828,6 +843,7 @@ class DetectMultiBackend(nn.Module):
 
 
 class AutoShape(nn.Module):
+    convclass = Conv
     # YOLOv5 input-robust model wrapper for passing cv2/np/PIL/torch inputs. Includes preprocessing, inference and NMS
     conf = 0.25  # NMS confidence threshold
     iou = 0.45  # NMS IoU threshold
@@ -972,6 +988,7 @@ class AutoShape(nn.Module):
 
 
 class Detections:
+    convclass = Conv
     # YOLOv5 detections class for inference results
     def __init__(self, ims, pred, files, times=(0, 0, 0), names=None, shape=None):
         super().__init__()
@@ -1151,26 +1168,28 @@ class Detections:
 
 
 class Proto(nn.Module):
+    convclass = Conv
     # YOLOv5 mask Proto module for segmentation models
     def __init__(self, c1, c_=256, c2=32):  # ch_in, number of protos, number of masks
         super().__init__()
-        self.cv1 = Conv(c1, c_, k=3)
+        self.cv1 = self.convclass(c1, c_, k=3)
         self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
-        self.cv2 = Conv(c_, c_, k=3)
-        self.cv3 = Conv(c_, c2)
+        self.cv2 = self.convclass(c_, c_, k=3)
+        self.cv3 = self.convclass(c_, c2)
 
     def forward(self, x):
         return self.cv3(self.cv2(self.upsample(self.cv1(x))))
 
 
 class Classify(nn.Module):
+    convclass = Conv
     # YOLOv5 classification head, i.e. x(b,c1,20,20) to x(b,c2)
     def __init__(
         self, c1, c2, k=1, s=1, p=None, g=1, dropout_p=0.0
     ):  # ch_in, ch_out, kernel, stride, padding, groups, dropout probability
         super().__init__()
         c_ = 1280  # efficientnet_b0 size
-        self.conv = Conv(c1, c_, k, s, autopad(k, p), g)
+        self.conv = self.convclass(c1, c_, k, s, autopad(k, p), g)
         self.pool = nn.AdaptiveAvgPool2d(1)  # to x(b,c_,1,1)
         self.drop = nn.Dropout(p=dropout_p, inplace=True)
         self.linear = nn.Linear(c_, c2)  # to x(b,c2)
@@ -1225,3 +1244,13 @@ class QConv(Conv):
    def forward_fuse(self, x):
        self._quantize_conv_weights()
        return super().forward_fuse(x)
+
+class QDWConv(QConv):
+    # Depth-wise convolution
+    # ch_in, ch_out, kernel, stride, dilation, activation
+    def __init__(self, c1, c2, k=1, s=1, d=1, act=True):
+        super().__init__(c1, c2, k, s, g=math.gcd(c1, c2), d=d, act=act)
+
+
+# SKIPPED: uses torch conv
+QDWConvTranspose2d = DWConvTranspose2d
