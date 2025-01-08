@@ -96,7 +96,7 @@ class QFocalLoss(nn.Module):
 
 def imitation_loss(teacher, student, mask):
     if student is None or teacher is None:
-        return torch.Tensor(0.)
+        return torch.Tensor([0.])
     # print(teacher.shape, student.shape, mask.shape)
     diff = torch.pow(student - teacher, 2) * mask
     diff = diff.sum() / mask.sum() / 2
@@ -107,7 +107,7 @@ def imitation_loss(teacher, student, mask):
 def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
     qbits = total_qbits(model)
-    Q = functools.reduce(lambda x, y: x + y, qbits, Torch.Tensor(0.0))
+    Q = functools.reduce(lambda x, y: x + y, qbits, Torch.Tensor([0.0]))
     return Q / weight_count
 
 
@@ -222,6 +222,8 @@ class ComputeLoss:
 
         lmask = imitation_loss(teacher, student, mask) * 0.01
         lcomp = compression_loss(self.model) * 0.05
+
+        print(lbox.shape, lobj.shape, lcls.shape, lmask.shape, lcomp.shape)
 
         return (
             (lbox + lobj + lcls + lmask + lcomp) * bs,
