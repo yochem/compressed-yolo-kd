@@ -548,7 +548,7 @@ def parse_model(d, ch, get_anchor=False):  # model_dict, input_channels(3)
                 n = 1
         elif m is nn.BatchNorm2d:
             args = [ch[f]]
-        elif m is (Concat, QConcat):
+        elif m in (Concat, QConcat):
             c2 = sum(ch[x] for x in f)
         # TODO: channel, gw, gd
         elif m in {Detect, Segment}:
