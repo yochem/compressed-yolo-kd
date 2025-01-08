@@ -84,7 +84,6 @@ class QConv(nn.Module):
             qw = self.qweight()
             w = (qw.round() - qw).detach() + qw
             qd = 2**self.e * w
-            print(self.conv.weight.shape, qd.shape)
             assert self.conv.weight.shape == qd.shape
             self.conv.weight = torch.nn.Parameter(qd)
 
