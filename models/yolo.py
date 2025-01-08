@@ -497,12 +497,8 @@ def parse_model(d, ch, get_anchor=False):  # model_dict, input_channels(3)
     ):  # from, number, module, args
         m = eval(m) if isinstance(m, str) else m  # eval strings
         for j, a in enumerate(args):
-            try:
+            with contextlib.suppress(NameError):
                 args[j] = eval(a) if isinstance(a, str) else a  # eval strings
-            except NameError:
-                LOGGER.warn(f"Can't parse layer {a}!!!")
-            # with contextlib.suppress(NameError):
-            #     args[j] = eval(a) if isinstance(a, str) else a  # eval strings
 
         n = n_ = max(round(n * gd), 1) if n > 1 else n  # depth gain
         if m in {
