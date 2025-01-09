@@ -1,11 +1,12 @@
-if not os.environ.get('VENV'):
-    print('activate virtual env first', file=sys.stderr)
-    exit(1)
-
 import os
 import sys
 import argparse
 from pathlib import Path
+
+if not os.environ.get('VENV'):
+    print('activate virtual env first', file=sys.stderr)
+    exit(1)
+
 
 import train
 import export
