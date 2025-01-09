@@ -28,7 +28,9 @@ def model_size(model):
                 bits.append(module.qbits())
             else:
                 # torch default 32 bits
-                bits.append(32 * sum(p.numel() for p in module.parameters(recurse=False)))
+                bits.append(
+                    32 * sum(p.numel() for p in module.parameters(recurse=False))
+                )
 
             for child in module.children():
                 bits.extend(recursive_walk(child))
