@@ -45,19 +45,19 @@ if args.operation == "export":
     require(args, 'weights')
     args.batch_size = 1
     args.include = 'tflite'
-    export.run(vars(**args))
+    export.run(**args)
 elif args.operation == "kd":
     require(args, 'name')
-    train.run(vars(**args))
+    train.run(**args)
 elif args.operation == "single":
     require(args, 'name')
     require(args, 'cfg')
     args.teacher_weight = None
-    train.run(vars(**args))
+    train.run(**args)
 elif args.operation == "val":
     require(args, 'weights')
     args.task = "test"
     args.name = Path(args.weights).parent.parent.name
-    val.run(vars(**args))
+    val.run(**args)
 else:
     require(args, 'operation')
