@@ -1,3 +1,7 @@
+if not os.environ.get('VENV'):
+    print('activate virtual env first', file=sys.stderr)
+    exit(1)
+
 import os
 import sys
 import argparse
@@ -7,10 +11,6 @@ import train
 import export
 import val
 
-
-if not os.environ.get('VENV'):
-    print('activate virtual env first', file=sys.stderr)
-    exit(1)
 
 def require(args, opt):
     if not getattr(args, opt):
