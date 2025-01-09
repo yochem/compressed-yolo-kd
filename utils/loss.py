@@ -96,7 +96,7 @@ class QFocalLoss(nn.Module):
 
 def imitation_loss(teacher, student, mask):
     if student is None or teacher is None:
-        return 0.
+        return 0.0
     # print(teacher.shape, student.shape, mask.shape)
     diff = torch.pow(student - teacher, 2) * mask
     diff = diff.sum() / mask.sum() / 2
@@ -107,7 +107,7 @@ def imitation_loss(teacher, student, mask):
 def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
     qbits = total_qbits(model)
-    Q = functools.reduce(lambda x, y: x + y, qbits, torch.tensor([0.0], device='cuda'))
+    Q = functools.reduce(lambda x, y: x + y, qbits, torch.tensor([0.0], device="cuda"))
     return Q / weight_count
 
 
@@ -162,6 +162,8 @@ class ComputeLoss:
         lcls = torch.zeros(1, device=self.device)  # class loss
         lbox = torch.zeros(1, device=self.device)  # box loss
         lobj = torch.zeros(1, device=self.device)  # object loss
+        lmask = torch.zeros(1, device=self.device)  # imitation loss
+        lcomp = torch.zeros(1, device=self.device)  # compression loss
         tcls, tbox, indices, anchors = self.build_targets(p, targets)  # targets
 
         # Losses
@@ -215,13 +217,15 @@ class ComputeLoss:
 
         if self.autobalance:
             self.balance = [x / self.balance[self.ssi] for x in self.balance]
+
         lbox *= self.hyp["box"]
         lobj *= self.hyp["obj"]
         lcls *= self.hyp["cls"]
         bs = tobj.shape[0]  # batch size
 
-        lmask = torch.tensor([imitation_loss(teacher, student, mask) * 0.01], device=self.device)
-        lcomp = compression_loss(self.model) * 0.005
+        print(self.hyp.get("comp", 0), self.hyp.get("mask", 0))
+        lmask += imitation_loss(teacher, student, mask) * self.hyp("mask", 0)
+        lcomp += compression_loss(self.model) * self.hyp("comp", 0)
 
         return (
             (lbox + lobj + lcls + lmask + lcomp) * bs,
