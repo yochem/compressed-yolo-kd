@@ -22,7 +22,7 @@ def require(args, opt):
 parser = argparse.ArgumentParser(description="YOLOv5 operations")
 parser.add_argument(
     "operation",
-    choices=["export", "kd", "single", "val"],
+    choices=["export", "train", "val"],
     help="Operation to perform",
 )
 
@@ -34,7 +34,7 @@ parser.add_argument("--batch-size", type=int, default=128, help="Batch size")
 parser.add_argument("--device", type=int, default=0, help="Device to use")
 parser.add_argument("--img-size", type=int, default=320, help="Image size")
 parser.add_argument("--int8", action="store_true", help="Use int8")
-parser.add_argument("--teacher_weight", default="pts/v5m.pt", help="Teacher weight file")
+parser.add_argument("--teacher_weight", help="Teacher weight file")
 parser.add_argument("--epochs", default=50, type=int, help="Number of epochs")
 parser.add_argument("--name", help="Name")
 
@@ -46,14 +46,9 @@ if args.operation == "export":
     args.batch_size = 1
     args.include = 'tflite'
     export.run(**vars(args))
-elif args.operation == "kd":
-    require(args, 'name')
-    train.run(**vars(args))
-elif args.operation == "single":
+elif args.operation == "train":
     require(args, 'name')
     require(args, 'cfg')
-    args.teacher_weight = None
-    print(args)
     train.run(**vars(args))
 elif args.operation == "val":
     require(args, 'weights')
