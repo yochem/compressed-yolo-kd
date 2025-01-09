@@ -8,11 +8,6 @@ if not os.environ.get('VIRTUAL_ENV'):
     exit(1)
 
 
-import train
-import export
-import val
-
-
 def require(args, opt):
     if not getattr(args, opt):
         print(f'{args.operation} requires {opt}', file=sys.stderr)
@@ -34,7 +29,7 @@ parser.add_argument("--batch-size", type=int, default=128, help="Batch size")
 parser.add_argument("--device", type=int, default=0, help="Device to use")
 parser.add_argument("--img-size", type=int, default=320, help="Image size")
 parser.add_argument("--int8", action="store_true", help="Use int8")
-parser.add_argument("--teacher_weight", help="Teacher weight file")
+parser.add_argument("--teacher-weight", help="Teacher weight file")
 parser.add_argument("--epochs", default=50, type=int, help="Number of epochs")
 parser.add_argument("--name", help="Name")
 
@@ -42,15 +37,18 @@ args = parser.parse_args()
 args.exist_ok = True
 
 if args.operation == "export":
+    import export
     require(args, 'weights')
     args.batch_size = 1
     args.include = 'tflite'
     export.run(**vars(args))
 elif args.operation == "train":
+    import train
     require(args, 'name')
     require(args, 'cfg')
     train.run(**vars(args))
 elif args.operation == "val":
+    import val
     require(args, 'weights')
     args.task = "test"
     args.name = Path(args.weights).parent.parent.name
