@@ -232,7 +232,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             device
         )  # create
 
-        LOGGER.info(f"Load teacher model from {teacher_weight}")  # report
+        LOGGER.info(f"Load teacher model from {teacher_weight} with lmask={hyp.get('mask')}")
+
+    LOGGER.info('self-compressing hyperparameter: ' + hyp.get('com'))
 
     # Freeze
     freeze = [
