@@ -35,7 +35,7 @@ parser.add_argument("--device", type=int, default=0, help="Device to use")
 parser.add_argument("--img-size", type=int, default=320, help="Image size")
 parser.add_argument("--int8", action="store_true", help="Use int8")
 parser.add_argument("--teacher_weight", default="pts/v5m.pt", help="Teacher weight file")
-parser.add_argument("--epochs", type=int, help="Number of epochs")
+parser.add_argument("--epochs", default=50, type=int, help="Number of epochs")
 parser.add_argument("--name", help="Name")
 
 args = parser.parse_args()
@@ -48,7 +48,6 @@ if args.operation == "export":
     export.run(**vars(args))
 elif args.operation == "kd":
     require(args, 'name')
-    print(args)
     train.run(**vars(args))
 elif args.operation == "single":
     require(args, 'name')
