@@ -26,7 +26,7 @@ parser.add_argument(
     help="Operation to perform",
 )
 
-parser.add_argument("--data", default="params/data-bear.yaml")
+parser.add_argument("--data", default="params/data-bears.yaml")
 parser.add_argument("--cfg", help="model config")
 parser.add_argument("--hyp", default="params/hyp.yaml")
 parser.add_argument("--weights", default="")
