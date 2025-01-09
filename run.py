@@ -28,6 +28,7 @@ parser.add_argument(
 
 parser.add_argument("--data", default="params/bear.yaml")
 parser.add_argument("--cfg", help="model config")
+parser.add_argument("--hyp", default="params/hyp.yaml")
 parser.add_argument("--weights", default="")
 parser.add_argument("--batch-size", type=int, default=128, help="Batch size")
 parser.add_argument("--device", type=int, default=0, help="Device to use")
