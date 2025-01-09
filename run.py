@@ -48,11 +48,13 @@ if args.operation == "export":
     export.run(**vars(args))
 elif args.operation == "kd":
     require(args, 'name')
+    print(args)
     train.run(**vars(args))
 elif args.operation == "single":
     require(args, 'name')
     require(args, 'cfg')
     args.teacher_weight = None
+    print(args)
     train.run(**vars(args))
 elif args.operation == "val":
     require(args, 'weights')
