@@ -27,11 +27,12 @@ def model_size(model):
             if hasattr(module, "qbits") and callable(getattr(module, "qbits")):
                 bits.append(module.qbits())
             else:
-                bits.append(sum(p.numel() for p in module.parameters(recurse=False)))
+                # torch default 32 bits
+                bits.append(32 * sum(p.numel() for p in module.parameters(recurse=False)))
 
             for child in module.children():
                 bits.extend(recursive_walk(child))
 
         return bits
 
-    return recursive_walk(model)
+    return sum(recursive_walk(model)) / 8

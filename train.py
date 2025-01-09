@@ -94,6 +94,7 @@ from utils.torch_utils import (
     smart_resume,
     torch_distributed_zero_first,
 )
+from utils.quant import model_size
 
 LOCAL_RANK = int(
     os.getenv("LOCAL_RANK", -1)
@@ -565,7 +566,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
             # Log
             if RANK in {-1, 0}:
-                modelbytes = loss_items[-1] / 8 * weight_count
+                modelbytes = model_size(model)
+                with open(save_dir / 'bytes.txt', 'a') as f:
+                    f.write(f'{modelbytes}\n')
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
                 pbar.set_description(
