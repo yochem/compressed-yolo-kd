@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-DATA=data/bears.yaml
+DATA=params/data-bears.yaml
 EPOCHS=30
 MODELDIR=pts
+HYP=params/hyp.yaml
 
 . ../venv/bin/activate
 
@@ -35,12 +36,13 @@ case "$1" in
 		;;
 
 	kd)
-		[ $# -lt 2 ] && usage "Error: '$1' command requires a models/ path"
+		[ $# -lt 2 ] && usage "Error: '$1' command requires a params/ path"
 		[ $# -lt 3 ] && usage "Error: '$1' command requires a name"
 		python train.py \
 			--device 0 \
 			--img-size 320 \
 			--data "$DATA" \
+			--hyp "$HYP" \
 			--cfg "$2" \
 			--weights '' \
 			--batch-size 128 \
@@ -52,12 +54,13 @@ case "$1" in
 		;;
 
 	single)
-		[ $# -lt 2 ] && usage "Error: '$1' command requires a models/ path"
+		[ $# -lt 2 ] && usage "Error: '$1' command requires a params/ path"
 		[ $# -lt 3 ] && usage "Error: '$1' command requires a name"
 		python train.py \
 			--device 0 \
 			--img-size 320 \
 			--data "$DATA" \
+			--hyp "$HYP" \
 			--cfg "$2" \
 			--weights '' \
 			--batch-size 128 \
