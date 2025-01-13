@@ -8,9 +8,9 @@ def total_qbits(model):
         if isinstance(module, nn.Module):
             if hasattr(module, "qbits") and callable(getattr(module, "qbits")):
                 qbits.append(module.qbits())
-
-            for child in module.children():
-                qbits.extend(recursive_walk(child))
+            else:
+                for child in module.children():
+                    qbits.extend(recursive_walk(child))
 
         return qbits
 
