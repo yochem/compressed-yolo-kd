@@ -57,7 +57,21 @@ from utils.general import (
     xyxy2xywh,
     yaml_load,
 )
-from utils.torch_utils import copy_attr, smart_inference_mode
+
+def copy_attr(a, b, include=(), exclude=()):
+    # Copy attributes from b to a, options to only include [...] and to exclude [...]
+    for k, v in b.__dict__.items():
+        if (len(include) and k not in include) or k.startswith("_") or k in exclude:
+            continue
+        else:
+            setattr(a, k, v)
+
+def smart_inference_mode(torch_1_9=check_version(torch.__version__, "1.9.0")):
+    # Applies torch.inference_mode() decorator if torch>=1.9.0 else torch.no_grad() decorator
+    def decorate(fn):
+        return (torch.inference_mode if torch_1_9 else torch.no_grad)()(fn)
+
+    return decorate
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
