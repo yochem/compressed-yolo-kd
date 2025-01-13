@@ -15,7 +15,6 @@ def export_command(args):
 
 def train_command(args):
     import train
-    del args.command
     train.run(**vars(args))
 
 def val_command(args):
@@ -58,4 +57,6 @@ val_parser.set_defaults(func=val_command)
 args = parser.parse_args()
 args.exist_ok = True
 
-args.func(args)
+func = args.func
+del args.func
+func(args)
