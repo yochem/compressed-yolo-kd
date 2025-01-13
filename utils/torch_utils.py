@@ -21,7 +21,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from utils.general import LOGGER, check_version, colorstr, file_date, git_describe
 from utils.quant import total_qbits
-from models.common import QConv
 
 LOCAL_RANK = int(
     os.getenv("LOCAL_RANK", -1)
@@ -409,6 +408,7 @@ def model_info(model, verbose=False, imgsz=640):
         if hasattr(model, "yaml_file")
         else "Model"
     )
+    from models.common import QConv
     LOGGER.info(
         f"{name} summary: {len(list(model.modules()))} layers, {n_p} parameters, {n_g} gradients, {n_q} ({QConv.count}) quantizable layers{fs}"
     )
