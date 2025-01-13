@@ -15,6 +15,7 @@ def export_command(args):
 
 def train_command(args):
     import train
+    del args.command
     train.run(**vars(args))
 
 def val_command(args):
