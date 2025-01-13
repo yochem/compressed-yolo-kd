@@ -1270,97 +1270,29 @@ class QDWConv(QConv):
         super().__init__(c1, c2, k, s, g=math.gcd(c1, c2), d=d, act=act)
 
 
-class QDWConvTranspose2d(DWConvTranspose2d):
-    convclass = QConv
-
-
-class QTransformerLayer(TransformerLayer):
-    convclass = QConv
-
-
-class QTransformerBlock(TransformerBlock):
-    convclass = QConv
-
-
-class QBottleneck(Bottleneck):
-    convclass = QConv
-
-
-class QBottleneckCSP(BottleneckCSP):
-    convclass = QConv
-
-
-class QCrossConv(CrossConv):
-    convclass = QConv
-
-
-class QC3(C3):
-    convclass = QConv
-
-
-class QC3x(C3x):
-    convclass = QConv
-
-
-class QC3TR(C3TR):
-    convclass = QConv
-
-
-class QC3SPP(C3SPP):
-    convclass = QConv
-
-
-class QC3Ghost(C3Ghost):
-    convclass = QConv
-
-
-class QSPP(SPP):
-    convclass = QConv
-
-
-class QSPPF(SPPF):
-    convclass = QConv
-
-
-class QFocus(Focus):
-    convclass = QConv
-
-
-class QGhostConv(GhostConv):
-    convclass = QConv
-
-
-class QGhostBottleneck(GhostBottleneck):
-    convclass = QConv
-
-
-class QContract(Contract):
-    convclass = QConv
-
-
-class QExpand(Expand):
-    convclass = QConv
-
-
-class QConcat(Concat):
-    convclass = QConv
-
-
-class QDetectMultiBackend(DetectMultiBackend):
-    convclass = QConv
-
-
-class QAutoShape(AutoShape):
-    convclass = QConv
-
-
-class QDetections:
-    convclass = QConv
-
-
-class QProto(Proto):
-    convclass = QConv
-
-
-class QClassify(Classify):
-    convclass = QConv
+# fmt: off
+class QDWConvTranspose2d(DWConvTranspose2d): convclass = QConv
+class QTransformerLayer(TransformerLayer): convclass = QConv
+class QTransformerBlock(TransformerBlock): convclass = QConv
+class QBottleneck(Bottleneck): convclass = QConv
+class QBottleneckCSP(BottleneckCSP): convclass = QConv
+class QCrossConv(CrossConv): convclass = QConv
+class QC3(C3): convclass = QConv
+class QC3x(C3x): convclass = QConv
+class QC3TR(C3TR): convclass = QConv
+class QC3SPP(C3SPP): convclass = QConv
+class QC3Ghost(C3Ghost): convclass = QConv
+class QSPP(SPP): convclass = QConv
+class QSPPF(SPPF): convclass = QConv
+class QFocus(Focus): convclass = QConv
+class QGhostConv(GhostConv): convclass = QConv
+class QGhostBottleneck(GhostBottleneck): convclass = QConv
+class QContract(Contract): convclass = QConv
+class QExpand(Expand): convclass = QConv
+class QConcat(Concat): convclass = QConv
+class QDetectMultiBackend(DetectMultiBackend): convclass = QConv
+class QAutoShape(AutoShape): convclass = QConv
+class QDetections: convclass = QConv
+class QProto(Proto): convclass = QConv
+class QClassify(Classify): convclass = QConv
+# fmt: on

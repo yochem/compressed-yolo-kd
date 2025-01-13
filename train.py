@@ -572,7 +572,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if RANK in {-1, 0}:
                 modelbytes = model_size(model)
                 with open(save_dir / "bytes.txt", "a") as f:
-                    f.write(f"{modelbytes}\n")
+                    f.write(f"{epoch} {modelbytes}\n")
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
                 pbar.set_description(
