@@ -24,7 +24,7 @@ def size_per_layer(model: nn.Module):
     #     print(model_size(l))
     #     print('--'*80)
     l = 0
-    for _ in model.children():
+    for _ in next(model.children()):
         l += 1
     print(l)
     exit(1)
