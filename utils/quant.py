@@ -1,7 +1,7 @@
 from torch import nn
 
 
-def total_qbits(model):
+def total_qbits(model: nn.Module):
     def recursive_walk(module):
         qbits = []
 
@@ -17,18 +17,10 @@ def total_qbits(model):
     return recursive_walk(model)
 
 
-def size_per_layer(model: nn.Module):
+def size_per_layer(model: nn.Module) -> list[float]:
     return [model_size(layer) for layer in next(model.children())]
 
-    # for l in next(model.children()):
-    #     print(l)
-    #     print(model_size(l))
-    #     print('--'*80)
-    # exit(1)
-    # return s
-
-
-def model_size(model):
+def model_size(model: nn.Module) -> float:
     """In bytes."""
 
     def recursive_walk(module):
@@ -36,7 +28,7 @@ def model_size(model):
 
         if isinstance(module, nn.Module):
             if hasattr(module, "qbits") and callable(getattr(module, "qbits")):
-                bits.append(module.qbits().detach())
+                bits.append(module.qbits().detach().item())
             else:
                 # torch default 32 bits
                 bits.append(
