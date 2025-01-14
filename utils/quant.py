@@ -48,4 +48,4 @@ def model_size(model):
 
         return bits
 
-    return sum(recursive_walk(model)) / 8
+    return (sum(recursive_walk(model)) / 8).item()
