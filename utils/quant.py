@@ -20,11 +20,13 @@ def total_qbits(model):
 def size_per_layer(model):
     # return [sum(model_size(layer)) for layer in model.children()]
     s = 0
-    for l in model.children():
+    for l in model:
         try:
             s += sum(model_size(l))
         except TypeError:
+            print('ERR:')
             print(l)
+            print('-' * 80)
     return s
 
 
