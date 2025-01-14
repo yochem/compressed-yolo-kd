@@ -602,7 +602,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 model, include=["yaml", "nc", "hyp", "names", "stride", "class_weights"]
             )
             with open(save_dir / "bytes.txt", "a") as f:
-                f.write(f"{epoch} {modelbytes.detach().item()}\n")
+                f.write(f"{epoch} {modelbytes}\n")
             with open(save_dir / "layer_sizes.txt", "a") as f:
                 f.write(f"{epoch} {size_per_layer(model)}\n")
             final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
