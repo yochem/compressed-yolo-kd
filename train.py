@@ -569,12 +569,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 last_opt_step = ni
 
             # Log
+            modelbytes = model_size(model)
             if RANK in {-1, 0}:
-                modelbytes = model_size(model)
-                with open(save_dir / "bytes.txt", "a") as f:
-                    f.write(f"{epoch} {modelbytes.detach().round()}\n")
-                with open(save_dir / "layer_sizes.txt", "a") as f:
-                    f.write(f"{epoch} {size_per_layer(model)}\n")
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
                 pbar.set_description(
@@ -605,6 +601,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             ema.update_attr(
                 model, include=["yaml", "nc", "hyp", "names", "stride", "class_weights"]
             )
+            with open(save_dir / "bytes.txt", "a") as f:
+                f.write(f"{epoch} {modelbytes.detach().round()}\n")
+            with open(save_dir / "layer_sizes.txt", "a") as f:
+                f.write(f"{epoch} {size_per_layer(model)}\n")
             final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
             if not noval or final_epoch:  # Calculate mAP
                 results, maps, _ = validate.run(
