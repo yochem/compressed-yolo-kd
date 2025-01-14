@@ -18,7 +18,13 @@ def total_qbits(model):
 
 
 def size_per_layer(model: nn.Module):
-    return [sum(model_size(layer)) for layer in next(model.children())]
+    # return [sum(model_size(layer)) for layer in next(model.children())]
+    for l in next(model.children()):
+        print(l)
+        print(model_size(l))
+        print('--'*80)
+    exit(1)
+    return s
 
 
 def model_size(model):
