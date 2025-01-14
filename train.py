@@ -136,15 +136,15 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     )
     callbacks.run("on_pretrain_routine_start")
 
-    with open(save_dir / "bytes.txt", "w") as f:
-        f.write("")
-    with open(save_dir / "layer_sizes.txt", "w") as f:
-        f.write("")
-
     # Directories
     w = save_dir / "weights"  # weights dir
     (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
     last, best = w / "last.pt", w / "best.pt"
+
+    with open(save_dir / "bytes.txt", "w") as f:
+        f.write("")
+    with open(save_dir / "layer_sizes.txt", "w") as f:
+        f.write("")
 
     # Hyperparameters
     if isinstance(hyp, str):
