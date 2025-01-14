@@ -94,7 +94,7 @@ from utils.torch_utils import (
     smart_resume,
     torch_distributed_zero_first,
 )
-from utils.quant import model_size
+from utils.quant import model_size, size_per_layer
 
 LOCAL_RANK = int(
     os.getenv("LOCAL_RANK", -1)
@@ -572,7 +572,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if RANK in {-1, 0}:
                 modelbytes = model_size(model)
                 with open(save_dir / "bytes.txt", "a") as f:
-                    f.write(f"{epoch} {modelbytes}\n")
+                    f.write(f"{epoch} {round(modelbytes}\n")
+                with open(save_dir / "layer_sizes.txt", "a") as f:
+                    f.write(f"{epoch} {size_per_layer(model)}\n")
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
                 pbar.set_description(

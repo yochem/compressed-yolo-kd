@@ -1246,7 +1246,7 @@ class Classify(nn.Module):
 
 class QConv(Conv):
     count = 0
-    bitcount = 0
+    weightcount = 0
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__(c1, c2, k, s, p, g, d, act)
