@@ -3,28 +3,35 @@ import sys
 import argparse
 from pathlib import Path
 
-if not os.environ.get('VIRTUAL_ENV'):
-    print('activate virtual env first', file=sys.stderr)
+if not os.environ.get("VIRTUAL_ENV"):
+    print("activate virtual env first", file=sys.stderr)
     exit(1)
+
 
 def export_command(args):
     import export
+
     args.batch_size = 1
-    args.include = 'tflite'
+    args.include = "tflite"
     export.run(**vars(args))
+
 
 def train_command(args):
     import train
+
     train.run(**vars(args))
+
 
 def val_command(args):
     import val
+
     args.task = "test"
     args.name = Path(args.weights).parent.parent.name
     val.run(**vars(args))
 
+
 parser = argparse.ArgumentParser(description="YOLOv5 operations")
-subparsers = parser.add_subparsers(dest='command', required=True)
+subparsers = parser.add_subparsers(dest="command", required=True)
 
 # Common arguments
 common_parser = argparse.ArgumentParser(add_help=False)
@@ -34,13 +41,13 @@ common_parser.add_argument("--batch-size", type=int, default=128, help="Batch si
 common_parser.add_argument("--imgsz", type=int, default=320, help="Image size")
 
 # Export subcommand
-export_parser = subparsers.add_parser('export', parents=[common_parser])
+export_parser = subparsers.add_parser("export", parents=[common_parser])
 export_parser.add_argument("--weights", required=True)
 export_parser.add_argument("--int8", action="store_true", help="Use int8")
 export_parser.set_defaults(func=export_command)
 
 # Train subcommand
-train_parser = subparsers.add_parser('train', parents=[common_parser])
+train_parser = subparsers.add_parser("train", parents=[common_parser])
 train_parser.add_argument("--cfg", required=True, help="model config")
 train_parser.add_argument("--hyp", default="params/hyp.yaml")
 train_parser.add_argument("--weights", default="")
@@ -50,7 +57,7 @@ train_parser.add_argument("--teacher-weight", help="Teacher weight file")
 train_parser.set_defaults(func=train_command)
 
 # Val subcommand
-val_parser = subparsers.add_parser('val', parents=[common_parser])
+val_parser = subparsers.add_parser("val", parents=[common_parser])
 val_parser.add_argument("--weights", required=True)
 val_parser.set_defaults(func=val_command)
 

@@ -16,8 +16,9 @@ def total_qbits(model):
 
     return recursive_walk(model)
 
+
 def size_per_layer(model):
-    return [sum(model_size(layer) for layer in model.children()]
+    return [sum(model_size(layer)) for layer in model.children()]
 
 
 def model_size(model):

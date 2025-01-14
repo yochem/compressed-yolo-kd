@@ -572,7 +572,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if RANK in {-1, 0}:
                 modelbytes = model_size(model)
                 with open(save_dir / "bytes.txt", "a") as f:
-                    f.write(f"{epoch} {round(modelbytes}\n")
+                    f.write(f"{epoch} {round(modelbytes)}\n")
                 with open(save_dir / "layer_sizes.txt", "a") as f:
                     f.write(f"{epoch} {size_per_layer(model)}\n")
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses

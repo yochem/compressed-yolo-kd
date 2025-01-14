@@ -58,6 +58,7 @@ from utils.general import (
     yaml_load,
 )
 
+
 def copy_attr(a, b, include=(), exclude=()):
     # Copy attributes from b to a, options to only include [...] and to exclude [...]
     for k, v in b.__dict__.items():
@@ -65,6 +66,7 @@ def copy_attr(a, b, include=(), exclude=()):
             continue
         else:
             setattr(a, k, v)
+
 
 def smart_inference_mode(torch_1_9=check_version(torch.__version__, "1.9.0")):
     # Applies torch.inference_mode() decorator if torch>=1.9.0 else torch.no_grad() decorator
