@@ -19,7 +19,7 @@ def total_qbits(model: nn.Module):
 
 def size_per_layer(model: nn.Module) -> list[int]:
     # return [model_size(layer) for layer in next(model.children())]
-    return [sum([x.detach().item() for x in total_qbits(layer)]) for layer in next(model.children())]
+    return [round(sum([x.detach().item() for x in total_qbits(layer)])) for layer in next(model.children())]
 
 def model_size(model: nn.Module) -> int:
     """In bytes."""
