@@ -17,10 +17,10 @@ def total_qbits(model):
     return recursive_walk(model)
 
 
-def size_per_layer(model):
+def size_per_layer(model: nn.Module):
     # return [sum(model_size(layer)) for layer in model.children()]
     s = 0
-    for l in model.layers():
+    for l in model.children():
         try:
             s += sum(model_size(l))
         except TypeError:
