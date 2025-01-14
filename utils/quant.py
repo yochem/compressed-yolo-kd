@@ -17,10 +17,10 @@ def total_qbits(model: nn.Module):
     return recursive_walk(model)
 
 
-def size_per_layer(model: nn.Module) -> list[float]:
+def size_per_layer(model: nn.Module) -> list[int]:
     return [model_size(layer) for layer in next(model.children())]
 
-def model_size(model: nn.Module) -> float:
+def model_size(model: nn.Module) -> int:
     """In bytes."""
 
     def recursive_walk(module: nn.Module) -> list[float]:
@@ -40,4 +40,4 @@ def model_size(model: nn.Module) -> float:
 
         return bits
 
-    return sum(recursive_walk(model)) / 8
+    return sum(recursive_walk(model)) // 8
