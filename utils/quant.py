@@ -23,7 +23,7 @@ def size_per_layer(model: nn.Module) -> list[float]:
 def model_size(model: nn.Module) -> float:
     """In bytes."""
 
-    def recursive_walk(module):
+    def recursive_walk(module: nn.Module) -> list[float]:
         bits = []
 
         if isinstance(module, nn.Module):
