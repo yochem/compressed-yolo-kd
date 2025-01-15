@@ -55,6 +55,7 @@ def model_size(model: nn.Module) -> int:
 
 class JsonResults:
     def __init__(self, path: str, model_params: dict):
+        self.path = path
         self.model_params = model_params
         self.epoch_fields = [
             "epoch",
@@ -71,7 +72,7 @@ class JsonResults:
         self.epoch_fields += [
             f"size_l{i}" for i, _ in enumerate(self.model_params["layers"])
         ]
-        self.epochs: dict[str, str] = []
+        self.epochs: list[dict[str, str]] = []
 
     @property
     def data(self) -> dict:
