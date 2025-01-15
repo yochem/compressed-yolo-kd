@@ -391,7 +391,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     result_file = JsonResults(
         save_dir / "results.json",
         {
-            "layers": [p[0] for p in model.named_children()],
+            "layers": [str(p[0]) for p in model.named_children()],
         },
     )
 
@@ -652,17 +652,17 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     "date": datetime.now().isoformat(),
                 }
                 r = {
-                    "epoch": epoch,
-                    "precision": results[0],
-                    "recall": results[1],
-                    "size_total": modelbytes,
-                    "loss_bbox": mloss[0],
-                    "loss_object": mloss[1],
-                    "loss_class": mloss[2],
-                    "loss_imitation": mloss[3],
-                    "loss_compression": mloss[4],
+                    "epoch": int(epoch),
+                    "precision": float(results[0]),
+                    "recall": float(results[1]),
+                    "size_total": int(modelbytes),
+                    "loss_bbox": float(mloss[0]),
+                    "loss_object": float(mloss[1]),
+                    "loss_class": float(mloss[2]),
+                    "loss_imitation": float(mloss[3]),
+                    "loss_compression": float(mloss[4]),
                 }
-                r.update({f"size_l{i}": ls for i, ls in enumerate(size_per_layer(model))})
+                r.update({f"size_l{i}": int(ls) for i, ls in enumerate(size_per_layer(model))})
                 result_file.add_epoch(r)
                 result_file.write()
 
@@ -897,7 +897,7 @@ def main(opt, callbacks=Callbacks()):
     # Checks
     if RANK in {-1, 0}:
         print_args(vars(opt))
-        check_git_status()
+        # check_git_status()
         check_requirements(ROOT / "requirements.txt")
 
     # Resume (from specified or most recent last.pt)
