@@ -388,13 +388,15 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         for param in teacher_model.parameters():
             param.requires_grad = False
 
-    result_file = JsonResults(
-        save_dir / "results.json",
-        {
-            "layers": [str(name) for name, _ in next(model.named_children())],
-        }
-    )
-    print(result_file.model_params['layers'])
+    # result_file = JsonResults(
+    #     save_dir / "results.json",
+    #     {
+    #         "layers": [str(name) for name, *_ in next(model.named_children())],
+    #     }
+    # )
+    # print(result_file.model_params['layers'])
+    print(model.model.named_children())
+    exit()
 
     # Start training
     t0 = time.time()
