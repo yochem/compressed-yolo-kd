@@ -83,7 +83,7 @@ class JsonResults:
 
     def write(self) -> None:
         print(self.data)
-        for key, val in self.data:
+        for key, val in self.data.items():
             print(f'{key} ({type(key)}): {val} ({type(val)})')
         with open(self.path, "w") as f:
             json.dump(self.data, f)
