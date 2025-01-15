@@ -69,9 +69,9 @@ class JsonResults:
             "loss_compression",
         ]
 
-        self.epoch_fields += [
+        self.epoch_fields.extend([
             f"size_l{i}" for i, _ in enumerate(self.model_params["layers"])
-        ]
+        ])
         self.epochs: list[dict[str, str]] = []
 
     @property
@@ -93,4 +93,4 @@ class JsonResults:
         if len(diff := set(epoch_data) - set(self.epoch_fields)) > 0:
             LOGGER.warning(f'unknown result fields: {", ".join(diff)}')
 
-        self.epochs += epoch_data
+        self.epochs.append(epoch_data)
