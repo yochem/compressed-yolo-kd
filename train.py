@@ -394,6 +394,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             "layers": [str(name) for name, _ in model.named_children()],
         },
     )
+    print(result_file.model_params['layers'])
 
     # Start training
     t0 = time.time()
