@@ -663,7 +663,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     "loss_compression": mloss[4],
                 }
                 r.update({f"size_l{i}": ls for i, ls in enumerate(size_per_layer(model))})
-                results_file.write(r)
+                result_file.write(r)
 
                 # Save last, best and delete
 
