@@ -94,7 +94,7 @@ from utils.torch_utils import (
     smart_resume,
     torch_distributed_zero_first,
 )
-from utils.quant import model_size, size_per_layer
+from utils.quant import model_size, size_per_layer, JsonResults
 
 LOCAL_RANK = int(
     os.getenv("LOCAL_RANK", -1)
@@ -140,11 +140,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     w = save_dir / "weights"  # weights dir
     (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
     last, best = w / "last.pt", w / "best.pt"
-
-    with open(save_dir / "bytes.txt", "w") as f:
-        f.write("")
-    with open(save_dir / "layer_sizes.txt", "w") as f:
-        f.write("")
 
     # Hyperparameters
     if isinstance(hyp, str):
@@ -392,6 +387,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
         for param in teacher_model.parameters():
             param.requires_grad = False
+
+    result_file = JsonResults(
+        save_dir / "results.json",
+        {
+            "layers": [p[0] for p in model.named_parameters()],
+        },
+    )
 
     # Start training
     t0 = time.time()
@@ -649,6 +651,19 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     "git": GIT_INFO,  # {remote, branch, commit} if a git repo
                     "date": datetime.now().isoformat(),
                 }
+                r = {
+                    "epoch": epoch,
+                    "precision": results[0],
+                    "recall": results[1],
+                    "size_total": modelbytes,
+                    "loss_bbox": mloss[0],
+                    "loss_object": mloss[1],
+                    "loss_class": mloss[2],
+                    "loss_imitation": mloss[3],
+                    "loss_compression": mloss[4],
+                }
+                r += {f"size_l{i}": ls for i, ls in enumerate(size_per_layer(model))}
+                results_file.write(r)
 
                 # Save last, best and delete
 

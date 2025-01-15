@@ -1,4 +1,9 @@
+import csv
+import json
+
 from torch import nn
+
+from loggers import LOGGER
 
 
 def total_qbits(model: nn.Module):
@@ -19,7 +24,11 @@ def total_qbits(model: nn.Module):
 
 def size_per_layer(model: nn.Module) -> list[int]:
     # return [model_size(layer) for layer in next(model.children())]
-    return [round(sum([x.detach().item() for x in total_qbits(layer)])) for layer in next(model.children())]
+    return [
+        round(sum([x.detach().item() for x in total_qbits(layer)]))
+        for layer in next(model.children())
+    ]
+
 
 def model_size(model: nn.Module) -> int:
     """In bytes."""
@@ -42,3 +51,45 @@ def model_size(model: nn.Module) -> int:
         return bits
 
     return sum(recursive_walk(model)) // 8
+
+
+class JsonResults:
+    def __init__(self, path: str, model_params: dict):
+        self.model_params = model_params
+        self.epoch_fields = [
+            "epoch",
+            "precision",
+            "recall",
+            "size_total",
+            "loss_object",
+            "loss_class",
+            "loss_bbox",
+            "loss_imitation",
+            "loss_compression",
+        ]
+
+        self.epoch_fields += [
+            f"size_l{i}" for i, _ in enumerate(self.model_params["layers"])
+        ]
+        self.epochs: dict[str, str] = []
+
+    @attribute
+    def data(self) -> dict:
+        return {
+            "params": self.model_params,
+            "epochs": self.epochs,
+        }
+
+    def write(self) -> None:
+        with open(self.path, "w") as f:
+            json.dump(self.data, f)
+
+    def add_epoch(self, epoch_data):
+        # missing keys
+        if len(diff := set(self.epoch_fields) - set(epoch_data)) > 0:
+            LOGGER.warning(f'missing result fields: {", ".join(diff)}')
+        # unknown keys
+        if len(diff := set(epoch_data) - set(self.epoch_fields)) > 0:
+            LOGGER.warning(f'unknown result fields: {", ".join(diff)}')
+
+        self.epochs += epoch_data
