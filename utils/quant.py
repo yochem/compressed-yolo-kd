@@ -72,7 +72,7 @@ class JsonResults:
         self.epoch_fields.extend([
             f"size_l{i}" for i, _ in enumerate(self.model_params["layers"])
         ])
-        self.epochs: list[dict[str, str]] = []
+        self.epochs: list[dict] = []
 
     @property
     def data(self) -> dict:
@@ -82,6 +82,9 @@ class JsonResults:
         }
 
     def write(self) -> None:
+        print(self.data)
+        for key, val in self.data:
+            print(f'{key} ({type(key)}): {val} ({type(val)})')
         with open(self.path, "w") as f:
             json.dump(self.data, f)
 
