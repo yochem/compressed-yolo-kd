@@ -3,7 +3,7 @@ import json
 
 from torch import nn
 
-from loggers import LOGGER
+from utils.loggers import LOGGER
 
 
 def total_qbits(model: nn.Module):
