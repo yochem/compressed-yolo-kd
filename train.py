@@ -392,7 +392,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         save_dir / "results.json",
         {
             "layers": [str(name) for name, _ in next(model.named_children())],
-        },
+        }
     )
     print(result_file.model_params['layers'])
 
