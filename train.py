@@ -395,7 +395,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     #     }
     # )
     # print(result_file.model_params['layers'])
-    print(model.model.named_children())
+    print(list(model.model.named_children()))
     exit()
 
     # Start training
