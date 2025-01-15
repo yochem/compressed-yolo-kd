@@ -73,7 +73,7 @@ class JsonResults:
         ]
         self.epochs: dict[str, str] = []
 
-    @attribute
+    @property
     def data(self) -> dict:
         return {
             "params": self.model_params,
