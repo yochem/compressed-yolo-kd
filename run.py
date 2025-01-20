@@ -68,4 +68,5 @@ args.exist_ok = True
 
 func = args.func
 del args.func
+del args.command
 func(args)
