@@ -60,7 +60,6 @@ from utils.general import (
     check_dataset,
     check_file,
     check_git_info,
-    check_git_status,
     check_img_size,
     check_requirements,
     check_suffix,
@@ -94,7 +93,7 @@ from utils.torch_utils import (
     smart_resume,
     torch_distributed_zero_first,
 )
-from utils.quant import model_size, size_per_layer, JsonResults
+from utils.quant import model_size, layer_size, JsonResults, layer_qbits
 
 LOCAL_RANK = int(
     os.getenv("LOCAL_RANK", -1)
@@ -392,9 +391,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         save_dir / "results.json",
         {
             "layers": [x.__class__.__name__ for x in model.model.children()],
-        }
+        },
     )
-    print(result_file.model_params['layers'])
+    print(result_file.model_params["layers"])
 
     # Start training
     t0 = time.time()
@@ -486,7 +485,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         if RANK in {-1, 0}:
             pbar = tqdm(pbar, total=nb, bar_format=TQDM_BAR_FORMAT)  # progress bar
         optimizer.zero_grad()
-        weight_count = sum(t.numel() for t in model.parameters())
         for i, (
             imgs,
             targets,
@@ -612,7 +610,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             with open(save_dir / "bytes.txt", "a") as f:
                 f.write(f"{epoch} {modelbytes}\n")
             with open(save_dir / "layer_sizes.txt", "a") as f:
-                f.write(f"{epoch} {size_per_layer(model)}\n")
+                f.write(f"{epoch} {layer_size(model)}\n")
             final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
             if not noval or final_epoch:  # Calculate mAP
                 results, maps, _ = validate.run(
@@ -663,7 +661,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     "loss_imitation": float(mloss[3]),
                     "loss_compression": float(mloss[4]),
                 }
-                r.update({f"size_l{i}": int(ls) for i, ls in enumerate(size_per_layer(model))})
+                r.update(
+                    {f"size_l{i}": int(ls) for i, ls in enumerate(layer_size(model))}
+                )
+                r.update(
+                    {f"qbits_l{i}": int(ls) for i, ls in enumerate(layer_qbits(model))}
+                )
                 result_file.add_epoch(r)
                 result_file.write()
 

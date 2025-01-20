@@ -23,7 +23,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from PIL import Image
-from torch.cuda import amp
 
 # Import 'ultralytics' package or install if if missing
 try:
