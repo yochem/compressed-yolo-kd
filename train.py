@@ -451,11 +451,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # kdcl
     if opt.colab:
         models = (model, teacher_model)
-        acc_recorder_list = []
         loss_recorder_list = []
         for model in models:
             model.train()
-            acc_recorder_list.append(kdcl.AverageMeter())
             loss_recorder_list.append(kdcl.AverageMeter())
 
 
@@ -550,11 +548,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 targets = targets.to(device)
                 if opt.colab:
                     outputs = []
-                    out_list = []
                     for model_idx, model in enumerate(models):
                         pred, feature, *_ = model(imgs, target=targets)
                         outputs.append(features)
-                        out_list.append(features)
                         print(feature.shape)
                     stable_out = torch.vstack(tuple(outputs)).mean(dim=0).detach()
                 else:
@@ -587,7 +583,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                         loss_items = items
                     div_loss = (
                         F.kl_div(
-                            F.log_softmax(out_list[model_idx] / T, dim=1),
+                            F.log_softmax(outputs[model_idx] / T, dim=1),
                             F.softmax(stable_out / T, dim=1),
                             reduction="batchmean",
                         )
@@ -603,8 +599,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     scaler.scale(loss).backward()
 
                 loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
-                acc = kdcl.accuracy(out_list[model_idx], targets)[0]
-                acc_recorder_list[model_idx].update(acc.item(), n=imgs.size(0))
             else:
                 scaler.scale(loss).backward()
 
