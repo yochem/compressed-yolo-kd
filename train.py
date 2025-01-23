@@ -582,17 +582,17 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     ce_loss, items = compute_loss(preds[model_idx], targets)
                     if loss_items is None:
                         loss_items = items
-                    # div_loss = (
-                    #     F.kl_div(
-                    #         F.log_softmax(outputs[model_idx] / T, dim=1),
-                    #         F.softmax(stable_out / T, dim=1),
-                    #         reduction="batchmean",
-                    #     )
-                    #     * T
-                    #     * T
-                    # )
-                    #
-                    # loss = (1 - alpha) * ce_loss + (alpha) * div_loss
+                    div_loss = (
+                        F.kl_div(
+                            F.log_softmax(outputs[model_idx] / T, dim=0),
+                            F.softmax(stable_out / T, dim=0),
+                            reduction="batchmean",
+                        )
+                        * T
+                        * T
+                    )
+
+                    loss = (1 - alpha) * ce_loss + (alpha) * div_loss
                     loss = ce_loss
 
                     loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
