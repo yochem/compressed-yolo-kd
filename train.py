@@ -576,10 +576,14 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
             # Backward
             if opt.colab:
+                # save STUDENT loss items
+                loss_items = None
                 T = 4.0
                 alpha = 0.5
                 for model_idx, model in enumerate(models):
-                    ce_loss = F.cross_entropy(out_list[model_idx], targets)
+                    ce_loss, items = compute_loss(pred, targets)
+                    if loss_items is None:
+                        loss_items = items
                     div_loss = (
                         F.kl_div(
                             F.log_softmax(out_list[model_idx] / T, dim=1),
