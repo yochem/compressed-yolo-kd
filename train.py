@@ -596,10 +596,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
                     if model_idx < len(models) - 1:
                         print('@retained')
-                        scaler.scale(loss).backward(retain_graph=True)
+                        # scaler.scale(loss).backward(retain_graph=True)
+                        loss.backward(retain_graph=True)
                     else:
                         print('@unretained')
-                        scaler.scale(loss).backward()
+                        # scaler.scale(loss).backward()
+                        loss.backward()
 
                     loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
             else:
