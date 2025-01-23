@@ -551,7 +551,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     for model_idx, model in enumerate(models):
                         pred, feature, *_ = model(imgs, target=targets)
                         outputs.append(features)
-                        print(feature.shape)
                     stable_out = torch.vstack(tuple(outputs)).mean(dim=0).detach()
                 else:
                     if opt.teacher_weight:
@@ -614,7 +613,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     scaler.update()
                     optimizer.zero_grad()
                     if ema:
-                        ema.update(model)
+                        try:
+                            ema.update(model)
+                        except KeyError:
+                            pass
                     last_opt_step = ni
 
             # Log
