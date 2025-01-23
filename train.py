@@ -402,7 +402,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     result_file = JsonResults(
         save_dir / "results.json",
         {
-            "layers": [x.__class__.__name__ for x in m.module.children()],
+            "layers": [x.__class__.__name__ for x in m.model.children()],
         },
     )
 
