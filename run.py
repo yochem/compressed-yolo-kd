@@ -17,6 +17,9 @@ def export_command(args):
 
 
 def train_command(args):
+    if opt.colab and opt.teacher_weight is None:
+        print('colab requires teacher weight/cfg', file=sys.stderr)
+        exit(1)
     import train
 
     train.run(**vars(args))
@@ -56,6 +59,7 @@ train_parser.add_argument("--weights", default="")
 train_parser.add_argument("--epochs", default=50, type=int, help="Number of epochs")
 train_parser.add_argument("--name", required=True, help="Name")
 train_parser.add_argument("--teacher-weight", help="Teacher weight file")
+train_parser.add_argument("--colab", help="KDCL mode")
 train_parser.set_defaults(func=train_command)
 
 # Val subcommand
