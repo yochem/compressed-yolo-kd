@@ -597,7 +597,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     if model_idx < len(models) - 1:
                         scaler.scale(loss).backward(retain_graph=True)
                     else:
-                        scaler.scale(loss).backward()
+                        scaler.scale(loss).backward(retain_graph=True)
 
                     loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
                     if ni - last_opt_step >= accumulate:
