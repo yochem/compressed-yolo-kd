@@ -587,7 +587,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     div_loss = (
                         F.kl_div(
                             F.log_softmax(outputs[model_idx] / T, dim=1),
-                            F.softmax(stable_out / T, dim=1),
+                            F.log_softmax(stable_out / T, dim=1),
                             reduction="batchmean",
                         )
                         * T
