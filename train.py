@@ -590,14 +590,14 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                         * T
                     )
 
-                loss = (1 - alpha) * ce_loss + (alpha) * div_loss
+                    loss = (1 - alpha) * ce_loss + (alpha) * div_loss
 
-                if model_idx < len(models) - 1:
-                    scaler.scale(loss).backward(retain_graph=True)
-                else:
-                    scaler.scale(loss).backward()
+                    if model_idx < len(models) - 1:
+                        scaler.scale(loss).backward(retain_graph=True)
+                    else:
+                        scaler.scale(loss).backward()
 
-                loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
+                    loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
             else:
                 scaler.scale(loss).backward()
 
