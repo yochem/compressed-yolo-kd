@@ -577,6 +577,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 T = 4.0
                 alpha = 0.5
                 for model_idx, model in enumerate(models):
+                    print(model)
                     ce_loss, items = compute_loss(pred, targets)
                     if loss_items is None:
                         loss_items = items
