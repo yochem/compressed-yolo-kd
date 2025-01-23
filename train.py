@@ -593,6 +593,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                         * T
                         * T
                     )
+                    print(ce_loss, div_loss)
 
                     loss = (1 - alpha) * ce_loss + (alpha) * div_loss
 
