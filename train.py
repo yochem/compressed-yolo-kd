@@ -200,7 +200,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         ckpt = torch.load(
             weights, map_location="cpu"
         )  # load checkpoint to CPU to avoid CUDA memory leak
-        model = Model(
+        m = Model(
             cfg or ckpt["model"].yaml, ch=3, nc=nc, anchors=hyp.get("anchors")
         ).to(
             device
@@ -210,14 +210,14 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             ["anchor"] if (cfg or hyp.get("anchors")) and not resume else []
         )  # exclude keys
         csd = ckpt["model"].float().state_dict()  # checkpoint state_dict as FP32
-        csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
-        model.load_state_dict(csd, strict=False)  # load
+        csd = intersect_dicts(csd, m.state_dict(), exclude=exclude)  # intersect
+        m.load_state_dict(csd, strict=False)  # load
         LOGGER.info(
-            f"Transferred {len(csd)}/{len(model.state_dict())} items from {weights}"
+            f"Transferred {len(csd)}/{len(m.state_dict())} items from {weights}"
         )  # report
     else:
-        model = Model(cfg, ch=3, nc=nc, anchors=hyp.get("anchors")).to(device)  # create
-    amp = check_amp(model)  # check AMP
+        m = Model(cfg, ch=3, nc=nc, anchors=hyp.get("anchors")).to(device)  # create
+    amp = check_amp(m)  # check AMP
 
     if opt.teacher_weight:
         teacher_weight = opt.teacher_weight
@@ -242,7 +242,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     freeze = [
         f"model.{x}." for x in (freeze if len(freeze) > 1 else range(freeze[0]))
     ]  # layers to freeze
-    for k, v in model.named_parameters():
+    for k, v in m.named_parameters():
         v.requires_grad = True  # train all layers
         # v.register_hook(lambda x: torch.nan_to_num(x))  # NaN to 0 (commented for erratic training results)
         if any(x in k for x in freeze):
@@ -250,12 +250,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             v.requires_grad = False
 
     # Image size
-    gs = max(int(model.stride.max()), 32)  # grid size (max stride)
+    gs = max(int(m.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
 
     # Batch size
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
-        batch_size = check_train_batch_size(model, imgsz, amp)
+        batch_size = check_train_batch_size(m, imgsz, amp)
         loggers.on_params_update({"batch_size": batch_size})
 
     # Optimizer
@@ -263,7 +263,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
     hyp["weight_decay"] *= batch_size * accumulate / nbs  # scale weight_decay
     optimizer = smart_optimizer(
-        model, opt.optimizer, hyp["lr0"], hyp["momentum"], hyp["weight_decay"]
+        m, opt.optimizer, hyp["lr0"], hyp["momentum"], hyp["weight_decay"]
     )
     if opt.colab:
         teacher_optim = smart_optimizer(
@@ -286,7 +286,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     )  # plot_lr_scheduler(optimizer, scheduler, epochs)
 
     # EMA
-    ema = ModelEMA(model) if RANK in {-1, 0} else None
+    ema = ModelEMA(m) if RANK in {-1, 0} else None
 
     # Resume
     best_fitness, start_epoch = 0.0, 0
@@ -303,13 +303,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             "WARNING ⚠️ DP not recommended, use torch.distributed.run for best DDP Multi-GPU results.\n"
             "See Multi-GPU Tutorial at https://docs.ultralytics.com/yolov5/tutorials/multi_gpu_training to get started."
         )
-        model = torch.nn.DataParallel(model)
+        m = torch.nn.DataParallel(m)
         if opt.teacher_weight:
             teacher_model = torch.nn.DataParallel(teacher_model)
 
     # SyncBatchNorm
     if opt.sync_bn and cuda and RANK != -1:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
+        m = torch.nn.SyncBatchNorm.convert_sync_batchnorm(m).to(device)
 
         if opt.teacher_weight:
             teacher_model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
@@ -362,30 +362,30 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         if not resume:
             if not opt.noautoanchor:
                 check_anchors(
-                    dataset, model=model, thr=hyp["anchor_t"], imgsz=imgsz
+                    dataset, model=m, thr=hyp["anchor_t"], imgsz=imgsz
                 )  # run AutoAnchor
-            model.half().float()  # pre-reduce anchor precision
+            m.half().float()  # pre-reduce anchor precision
 
         callbacks.run("on_pretrain_routine_end", labels, names)
 
     # DDP mode
     if cuda and RANK != -1:
-        model = smart_DDP(model)
+        m = smart_DDP(m)
         if opt.teacher_weight:
             teacher_model = smart_DDP(teacher_model)
 
     # Model attributes
-    nl = de_parallel(model).model[-1].nl  # number of detection layers (to scale hyps)
+    nl = de_parallel(m).model[-1].nl  # number of detection layers (to scale hyps)
     hyp["box"] *= 3 / nl  # scale to layers
     hyp["cls"] *= nc / 80 * 3 / nl  # scale to classes and layers
     hyp["obj"] *= (imgsz / 640) ** 2 * 3 / nl  # scale to image size and layers
     hyp["label_smoothing"] = opt.label_smoothing
-    model.nc = nc  # attach number of classes to model
-    model.hyp = hyp  # attach hyperparameters to model
-    model.class_weights = (
+    m.nc = nc  # attach number of classes to model
+    m.hyp = hyp  # attach hyperparameters to model
+    m.class_weights = (
         labels_to_class_weights(dataset.labels, nc).to(device) * nc
     )
-    model.names = names
+    m.names = names
 
     if opt.teacher_weight:
         teacher_model.nc = nc  # attach number of classes to model
@@ -402,7 +402,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     result_file = JsonResults(
         save_dir / "results.json",
         {
-            "layers": [x.__class__.__name__ for x in model.model.children()],
+            "layers": [x.__class__.__name__ for x in m.model.children()],
         },
     )
 
@@ -419,7 +419,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = torch.amp.GradScaler("cuda", enabled=amp)
     stopper, stop = EarlyStopping(patience=opt.patience), False
-    compute_loss = ComputeLoss(model)  # init loss class
+    compute_loss = ComputeLoss(m)  # init loss class
     callbacks.run("on_train_start")
     LOGGER.info(
         f"Image sizes {imgsz} train, {imgsz} val\n"
@@ -431,7 +431,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     if opt.teacher_weight:
         dump_image = torch.zeros((1, 3, opt.imgsz, opt.imgsz), device=device)
         targets = torch.Tensor([[0, 0, 0, 0, 0, 0]]).to(device)
-        _, features, _ = model(dump_image, target=targets)  # forward
+        _, features, _ = m(dump_image, target=targets)  # forward
         _, teacher_feature, _ = teacher_model(dump_image, target=targets)
 
         _, student_channel, student_out_size, _ = features.shape
@@ -450,24 +450,24 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # kdcl
     if opt.colab:
-        models = (model, teacher_model)
+        models = (m, teacher_model)
         loss_recorder_list = []
-        for model in models:
-            model.train()
+        for m in models:
+            m.train()
             loss_recorder_list.append(kdcl.AverageMeter())
 
 
     # epoch ------------------------------------------------------------------
     for epoch in range(start_epoch, epochs):
         callbacks.run("on_train_epoch_start")
-        model.train()
+        m.train()
         if opt.teacher_weight:
             teacher_model.train() if opt.colab else teacher_model.eval()
 
         # Update image weights (optional, single-GPU only)
         if opt.image_weights:
             # class weights
-            cw = (model.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc)
+            cw = (m.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc)
             # image weights
             iw = labels_to_image_weights(dataset.labels, nc=nc, class_weights=cw)
             # rand weighted idx
@@ -547,21 +547,23 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             with torch.amp.autocast("cuda"):
                 targets = targets.to(device)
                 if opt.colab:
+                    preds = []
                     outputs = []
-                    for model_idx, model in enumerate(models):
-                        pred, feature, *_ = model(imgs, target=targets)
+                    for model_idx, m in enumerate(models):
+                        pred, feature, *_ = m(imgs, target=targets)
+                        preds.append(pred)
                         outputs.append(features)
                     stable_out = torch.vstack(tuple(outputs)).mean(dim=0).detach()
                 else:
                     if opt.teacher_weight:
-                        pred, features, _ = model(imgs, target=targets)  # forward
+                        pred, features, _ = m(imgs, target=targets)  # forward
                         teacher_pred, teacher_feature, mask = teacher_model(imgs, target=targets)
                         # loss scaled by batch_size
                         teacher_feature = teacher_feature.detach()
                         mask = mask.detach()
                         loss, loss_items = compute_loss(pred, targets, teacher_feature, stu_feature_adapt(features), mask)
                     else:
-                        pred = model(imgs)  # forward
+                        pred = m(imgs)  # forward
                         # loss scaled by batch_size
                         loss, loss_items = compute_loss(pred, targets)
 
@@ -576,9 +578,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 loss_items = None
                 T = 4.0
                 alpha = 0.5
-                for model_idx, model in enumerate(models):
-                    print(model)
-                    ce_loss, items = compute_loss(pred, targets)
+                for model_idx, m in enumerate(models):
+                    print(m)
+                    ce_loss, items = compute_loss(preds[model_idx], targets)
                     if loss_items is None:
                         loss_items = items
                     div_loss = (
@@ -605,23 +607,21 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
             if not opt.colab:
                 optims = [optimizer]
+                models = [m]
 
-            for optim in optims:
+            for m, optim in zip(models, optims):
                 if ni - last_opt_step >= accumulate:
                     scaler.unscale_(optim)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+                    torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=10.0)
                     scaler.step(optim)
                     scaler.update()
-                    optimizer.zero_grad()
+                    optim.zero_grad()
                     if ema:
-                        try:
-                            ema.update(model)
-                        except KeyError:
-                            pass
+                        ema.update(m)
                     last_opt_step = ni
 
             # Log
-            modelbytes = model_size(model)
+            modelbytes = model_size(m)
             if RANK in {-1, 0}:
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
@@ -637,7 +637,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     )
                 )
                 callbacks.run(
-                    "on_train_batch_end", model, ni, imgs, targets, paths, list(mloss)
+                    "on_train_batch_end", m, ni, imgs, targets, paths, list(mloss)
                 )
                 if callbacks.stop_training:
                     return
@@ -651,12 +651,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # mAP
             callbacks.run("on_train_epoch_end", epoch=epoch)
             ema.update_attr(
-                model, include=["yaml", "nc", "hyp", "names", "stride", "class_weights"]
+                m, include=["yaml", "nc", "hyp", "names", "stride", "class_weights"]
             )
             with open(save_dir / "bytes.txt", "a") as f:
                 f.write(f"{epoch} {modelbytes}\n")
             with open(save_dir / "layer_sizes.txt", "a") as f:
-                f.write(f"{epoch} {layer_size(model)}\n")
+                f.write(f"{epoch} {layer_size(m)}\n")
             final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
             if not noval or final_epoch:  # Calculate mAP
                 results, maps, _ = validate.run(
@@ -688,7 +688,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 ckpt = {
                     "epoch": epoch,
                     "best_fitness": best_fitness,
-                    "model": deepcopy(de_parallel(model)).half(),
+                    "model": deepcopy(de_parallel(m)).half(),
                     "ema": deepcopy(ema.ema).half(),
                     "updates": ema.updates,
                     "optimizer": optimizer.state_dict(),
@@ -708,10 +708,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     "loss_compression": float(mloss[4]),
                 }
                 r.update(
-                    {f"size_l{i}": int(ls) for i, ls in enumerate(layer_size(model))}
+                    {f"size_l{i}": int(ls) for i, ls in enumerate(layer_size(m))}
                 )
                 r.update(
-                    {f"qbits_l{i}": int(ls) for i, ls in enumerate(layer_qbits(model))}
+                    {f"qbits_l{i}": int(ls) for i, ls in enumerate(layer_qbits(m))}
                 )
                 result_file.add_epoch(r)
                 result_file.write()
