@@ -34,7 +34,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 import yaml
 from torch.optim import lr_scheduler
 from tqdm import tqdm
