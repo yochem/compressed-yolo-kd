@@ -549,16 +549,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             with torch.amp.autocast("cuda"):
                 targets = targets.to(device)
                 if opt.colab:
-                    outputs = torch.zeros(
-                        size=(len(models), imgs.size(0), 100), dtype=torch.float
-                    ).cuda()
+                    outputs = []
                     out_list = []
                     for model_idx, model in enumerate(models):
-                        out = model.forward(imgs[:, model_idx, ...])
-                        outputs[model_idx, ...] = out
-                        out_list.append(out)
-                        stable_out = outputs.mean(dim=0)
-                        stable_out = stable_out.detach()
+                        pred = model(imgs)
+                        outputs.append(pred)
+                        out_list.append(pred)
+                    stable_out = torch.stack(outputs).mean(dim=0).detach()
                 else:
                     if opt.teacher_weight:
                         pred, features, _ = model(imgs, target=targets)  # forward
