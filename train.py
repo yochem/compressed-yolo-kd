@@ -555,7 +555,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                         pred = model(imgs)
                         outputs.append(pred)
                         out_list.append(pred)
-                    stable_out = torch.stack(outputs).mean(dim=0).detach()
+                    stable_out = torch.stack(*outputs).mean(dim=0).detach()
                 else:
                     if opt.teacher_weight:
                         pred, features, _ = model(imgs, target=targets)  # forward
