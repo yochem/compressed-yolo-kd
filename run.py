@@ -17,7 +17,7 @@ def export_command(args):
 
 
 def train_command(args):
-    if opt.colab and opt.teacher_weight is None:
+    if args.colab and args.teacher_weight is None:
         print('colab requires teacher weight/cfg', file=sys.stderr)
         exit(1)
     import train
