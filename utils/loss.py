@@ -10,6 +10,7 @@ import torch.nn as nn
 from utils.metrics import bbox_iou
 from utils.torch_utils import de_parallel
 from utils.quant import total_qbits
+from utils.kdcl import AverageMeter
 
 
 def smooth_BCE(
@@ -103,6 +104,35 @@ def imitation_loss(teacher, student, mask):
 
     return diff
 
+def kdcl_loss(preds, targets):
+    outputs = torch.stack(preds)
+    stable_out = outputs.mean(dim=0).detach()
+
+    losses = []
+    accurs = []
+    retain_graphs = (True, False)
+
+    for pred, retain_graph in zip(preds, retain_graphs):
+        ce_loss = F.cross_entropy(pred, targets)
+        lsm = F.log_softmax(pred / T, dim=1)
+        sm = F.softmax(stable_out / T, dim=1)
+        div_loss = F.kl_div(lsm, sm, reduction="batchmean") * T * T
+
+        loss = (1 - alpha) * ce_loss + (alpha) * div_loss
+
+        loss_meter = AverageMeter()
+        loss_meter.update(loss.item(), n=len(targets))
+        losses.append(loss_meter)
+
+        acc = accuracy(pred, targets)[0]
+        acc_meter = AverageMeter()
+        acc_meter.update(acc.item(), n=len(targets))
+        accurs.append(acc_meter)
+
+    avg_losses = [recorder.avg for recorder in losses]
+    avg_accurs = [recorder.avg for recorder in accurs]
+    return avg_losses, avg_accurs
+
 
 def compression_loss(model):
     weight_count = sum(t.numel() for t in model.parameters())
@@ -163,6 +193,7 @@ class ComputeLoss:
         lbox = torch.zeros(1, device=self.device)  # box loss
         lobj = torch.zeros(1, device=self.device)  # object loss
         lmask = torch.zeros(1, device=self.device)  # imitation loss
+        lkdcl = torch.zeros(1, device=self.device)  # KDCL loss
         lcomp = torch.zeros(1, device=self.device)  # compression loss
         tcls, tbox, indices, anchors = self.build_targets(p, targets)  # targets
 
@@ -223,6 +254,7 @@ class ComputeLoss:
         lcls *= self.hyp["cls"]
         bs = tobj.shape[0]  # batch size
 
+        lkdcl += kdcl_loss(p, targets)
         lmask += imitation_loss(teacher, student, mask) * self.hyp.get("mask", 0)
         lcomp += compression_loss(self.model) * self.hyp.get("comp", 0)
 

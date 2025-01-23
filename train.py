@@ -14,7 +14,6 @@ Models:     https://github.com/ultralytics/yolov5/tree/master/models
 Datasets:   https://github.com/ultralytics/yolov5/tree/master/data
 Tutorial:   https://docs.ultralytics.com/yolov5/tutorials/train_custom_data
 """
-
 import argparse
 import math
 import os
@@ -35,6 +34,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+import torch.functional as F
 import yaml
 from torch.optim import lr_scheduler
 from tqdm import tqdm
@@ -94,6 +94,7 @@ from utils.torch_utils import (
     torch_distributed_zero_first,
 )
 from utils.quant import model_size, layer_size, JsonResults, layer_qbits
+from utils import kdcl
 
 LOCAL_RANK = int(
     os.getenv("LOCAL_RANK", -1)
@@ -220,16 +221,16 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     if opt.teacher_weight:
         teacher_weight = opt.teacher_weight
-        with torch_distributed_zero_first(LOCAL_RANK):
-            teacher_weight = attempt_download(
-                teacher_weight
-            )  # download if not found locally
-        teacher_ckpt = torch.load(teacher_weight, map_location=device)
-        teacher_model = Model(
-            cfg or teacher_ckpt["model"].yaml, ch=3, nc=nc, anchors=hyp.get("anchors")
-        ).to(
-            device
-        )  # create
+        if not opt.colab:
+            with torch_distributed_zero_first(LOCAL_RANK):
+                teacher_weight = attempt_download(teacher_weight)
+            teacher_ckpt = torch.load(teacher_weight, map_location=device)
+            teacher_cfg = teacher_ckpt['model'].yaml
+        else:
+            assert teacher_weight.endswith('.yaml'), 'teacher-weight should be a cfg'
+            teacher_cfg = teacher_weight
+
+        teacher_model = Model(teacher_cfg, ch=3, nc=nc, anchors=hyp.get("anchors")).to(device)
 
         LOGGER.info(
             f"Load teacher model from {teacher_weight} with lmask={hyp.get('mask')}"
@@ -264,12 +265,22 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     optimizer = smart_optimizer(
         model, opt.optimizer, hyp["lr0"], hyp["momentum"], hyp["weight_decay"]
     )
+    if opt.colab:
+        teacher_optim = smart_optimizer(
+            teacher_model,
+            opt.optimizer,
+            hyp["lr0"],
+            hyp["momentum"],
+            hyp["weight_decay"]
+        )
+        optims = (optimizer, teacher_optim)
 
     # Scheduler
     if opt.cos_lr:
         lf = one_cycle(1, hyp["lrf"], epochs)  # cosine 1->hyp['lrf']
     else:
-        lf = lambda x: (1 - x / epochs) * (1.0 - hyp["lrf"]) + hyp["lrf"]  # linear
+        def lf(x):
+            return (1 - x / epochs) * (1.0 - hyp["lrf"]) + hyp["lrf"]  # linear
     scheduler = lr_scheduler.LambdaLR(
         optimizer, lr_lambda=lf
     )  # plot_lr_scheduler(optimizer, scheduler, epochs)
@@ -373,7 +384,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     model.hyp = hyp  # attach hyperparameters to model
     model.class_weights = (
         labels_to_class_weights(dataset.labels, nc).to(device) * nc
-    )  # attach class weights
+    )
     model.names = names
 
     if opt.teacher_weight:
@@ -384,8 +395,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         )  # attach class weights
         teacher_model.names = names
 
-        for param in teacher_model.parameters():
-            param.requires_grad = False
+        if not opt.colab:
+            for param in teacher_model.parameters():
+                param.requires_grad = False
 
     result_file = JsonResults(
         save_dir / "results.json",
@@ -393,7 +405,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             "layers": [x.__class__.__name__ for x in model.model.children()],
         },
     )
-    print(result_file.model_params["layers"])
 
     # Start training
     t0 = time.time()
@@ -437,25 +448,32 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             nn.ReLU(),
         ).to(device)
 
-    for epoch in range(
-        start_epoch, epochs
-    ):  # epoch ------------------------------------------------------------------
+    # kdcl
+    if opt.colab:
+        models = (model, teacher_model)
+        acc_recorder_list = []
+        loss_recorder_list = []
+        for model in models:
+            model.train()
+            acc_recorder_list.append(kdcl.AverageMeter())
+            loss_recorder_list.append(kdcl.AverageMeter())
+
+
+    # epoch ------------------------------------------------------------------
+    for epoch in range(start_epoch, epochs):
         callbacks.run("on_train_epoch_start")
         model.train()
         if opt.teacher_weight:
-            teacher_model.eval()
+            teacher_model.train() if opt.colab else teacher_model.eval()
 
         # Update image weights (optional, single-GPU only)
         if opt.image_weights:
-            cw = (
-                model.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc
-            )  # class weights
-            iw = labels_to_image_weights(
-                dataset.labels, nc=nc, class_weights=cw
-            )  # image weights
-            dataset.indices = random.choices(
-                range(dataset.n), weights=iw, k=dataset.n
-            )  # rand weighted idx
+            # class weights
+            cw = (model.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc)
+            # image weights
+            iw = labels_to_image_weights(dataset.labels, nc=nc, class_weights=cw)
+            # rand weighted idx
+            dataset.indices = random.choices(range(dataset.n), weights=iw, k=dataset.n)
 
         # Update mosaic border (optional)
         # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
@@ -485,19 +503,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         if RANK in {-1, 0}:
             pbar = tqdm(pbar, total=nb, bar_format=TQDM_BAR_FORMAT)  # progress bar
         optimizer.zero_grad()
-        for i, (
-            imgs,
-            targets,
-            paths,
-            _,
-        ) in (
-            pbar
-        ):  # batch -------------------------------------------------------------
+        # batch -------------------------------------------------------------
+        for i, (imgs, targets, paths, _) in pbar:
             callbacks.run("on_train_batch_start")
             ni = i + nb * epoch  # number integrated batches (since train start)
-            imgs = (
-                imgs.to(device, non_blocking=True).float() / 255
-            )  # uint8 to float32, 0-255 to 0.0-1.0
+            # uint8 to float32, 0-255 to 0.0-1.0
+            imgs = imgs.to(device, non_blocking=True).float() / 255
 
             # Warmup
             if ni <= nw:
@@ -537,21 +548,29 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
             with torch.amp.autocast("cuda"):
                 targets = targets.to(device)
-                if opt.teacher_weight:
-                    pred, features, _ = model(imgs, target=targets)  # forward
-                    _, teacher_feature, mask = teacher_model(imgs, target=targets)
-                    loss, loss_items = compute_loss(
-                        pred,
-                        targets,
-                        teacher_feature.detach(),
-                        stu_feature_adapt(features),
-                        mask.detach(),
-                    )  # loss scaled by batch_size
+                if opt.colab:
+                    outputs = torch.zeros(
+                        size=(len(models), imgs.size(0), 100), dtype=torch.float
+                    ).cuda()
+                    out_list = []
+                    for model_idx, model in enumerate(models):
+                        out = model.forward(imgs[:, model_idx, ...])
+                        outputs[model_idx, ...] = out
+                        out_list.append(out)
+                        stable_out = outputs.mean(dim=0)
+                        stable_out = stable_out.detach()
                 else:
-                    pred = model(imgs)  # forward
-                    loss, loss_items = compute_loss(
-                        pred, targets
-                    )  # loss scaled by batch_size
+                    if opt.teacher_weight:
+                        pred, features, _ = model(imgs, target=targets)  # forward
+                        teacher_pred, teacher_feature, mask = teacher_model(imgs, target=targets)
+                        # loss scaled by batch_size
+                        teacher_feature = teacher_feature.detach()
+                        mask = mask.detach()
+                        loss, loss_items = compute_loss(pred, targets, teacher_feature, stu_feature_adapt(features), mask)
+                    else:
+                        pred = model(imgs)  # forward
+                        # loss scaled by batch_size
+                        loss, loss_items = compute_loss(pred, targets)
 
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
@@ -559,20 +578,48 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     loss *= 4.0
 
             # Backward
-            scaler.scale(loss).backward()
+            if opt.colab:
+                T = 4.0
+                alpha = 0.5
+                for model_idx, model in enumerate(models):
+                    ce_loss = F.cross_entropy(out_list[model_idx], targets)
+                    div_loss = (
+                        F.kl_div(
+                            F.log_softmax(out_list[model_idx] / T, dim=1),
+                            F.softmax(stable_out / T, dim=1),
+                            reduction="batchmean",
+                        )
+                        * T
+                        * T
+                    )
+
+                loss = (1 - alpha) * ce_loss + (alpha) * div_loss
+
+                if model_idx < len(models) - 1:
+                    loss.backward(retain_graph=True)
+                else:
+                    loss.backward()
+
+                loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
+                acc = kdcl.accuracy(out_list[model_idx], targets)[0]
+                acc_recorder_list[model_idx].update(acc.item(), n=imgs.size(0))
+            else:
+                scaler.scale(loss).backward()
 
             # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-            if ni - last_opt_step >= accumulate:
-                scaler.unscale_(optimizer)  # unscale gradients
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), max_norm=10.0
-                )  # clip gradients
-                scaler.step(optimizer)  # optimizer.step
-                scaler.update()
-                optimizer.zero_grad()
-                if ema:
-                    ema.update(model)
-                last_opt_step = ni
+            if not opt.colab:
+                optims = [optimizer]
+
+            for optim in optims:
+                if ni - last_opt_step >= accumulate:
+                    scaler.unscale_(optim)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+                    scaler.step(optim)
+                    scaler.update()
+                    optimizer.zero_grad()
+                    if ema:
+                        ema.update(model)
+                    last_opt_step = ni
 
             # Log
             modelbytes = model_size(model)
@@ -743,6 +790,7 @@ def parse_opt(known=False):
     parser.add_argument(
         "--teacher_weight", type=str, default="", help="initial weights path"
     )
+    parser.add_argument("--colab", action="store_true", help="train teacher too")
     parser.add_argument("--cfg", type=str, default="", help="model.yaml path")
     parser.add_argument(
         "--data", type=str, default=ROOT / "data/coco128.yaml", help="dataset.yaml path"
