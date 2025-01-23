@@ -600,24 +600,26 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                         scaler.scale(loss).backward()
 
                     loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
+                    if ni - last_opt_step >= accumulate:
+                        scaler.unscale_(optims[model_idx])
+                        torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=10.0)
+                        scaler.step(optims[model_idx])
+                        scaler.update()
+                        optims[model_idx].zero_grad()
+                        if ema:
+                            ema.update(m)
+                        last_opt_step = ni
             else:
                 scaler.scale(loss).backward()
 
-            # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-            if not opt.colab:
-                optims = [optimizer]
-                models = [m]
-
-            for m, optim in zip(models, optims):
-                # if ni - last_opt_step >= accumulate:
-                if True:
-                    scaler.unscale_(optim)
-                    torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=10.0)
-                    scaler.step(optim)
+                if ni - last_opt_step >= accumulate:
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+                    scaler.step(optimizer)
                     scaler.update()
-                    optim.zero_grad()
+                    optimizer.zero_grad()
                     if ema:
-                        ema.update(m)
+                        ema.update(model)
                     last_opt_step = ni
 
             # Log
