@@ -579,6 +579,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 T = 4.0
                 alpha = 0.5
                 for model_idx, m in enumerate(models):
+                    print('loop start', model_idx)
                     ce_loss, items = compute_loss(preds[model_idx], targets)
                     if loss_items is None:
                         loss_items = items
@@ -594,12 +595,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
                     loss = (1 - alpha) * ce_loss + (alpha) * div_loss
 
-                    if model_idx < len(models) - 1:
-                        scaler.scale(loss).backward(retain_graph=True)
-                    else:
-                        scaler.scale(loss).backward(retain_graph=True)
-
                     loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
+                    scaler.scale(loss).backward(retain_graph=True)
+
                     if ni - last_opt_step >= accumulate:
                         scaler.unscale_(optims[model_idx])
                         torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=10.0)
