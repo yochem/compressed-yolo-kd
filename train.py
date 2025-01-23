@@ -578,16 +578,15 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if opt.colab:
                 # save STUDENT loss items
                 loss_items = None
-                T = 4.0
+                T = 0.2
                 alpha = 0.5
                 for model_idx, m in enumerate(models):
                     ce_loss, items = compute_loss(preds[model_idx], targets)
                     if loss_items is None:
                         loss_items = items
-                    print(outputs[model_idx].shape, stable_out.shape)
                     div_loss = (
                         F.kl_div(
-                            F.log_softmax(outputs[model_idx] / T, dim=1),
+                            F.softmax(outputs[model_idx] / T, dim=1),
                             F.softmax(stable_out / T, dim=1),
                             reduction="batchmean",
                         )
