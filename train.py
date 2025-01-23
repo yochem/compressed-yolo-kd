@@ -553,8 +553,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     out_list = []
                     for model_idx, model in enumerate(models):
                         pred, feature, *_ = model(imgs, target=targets)
-                        outputs.append(feature)
-                        out_list.append(feature)
+                        outputs.append(pred)
+                        out_list.append(pred)
                     # stable_out = torch.vstack(tuple(outputs)).mean(dim=0).detach()
                     print(outputs[0].shape)
                 else:
