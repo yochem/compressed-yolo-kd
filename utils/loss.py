@@ -254,7 +254,7 @@ class ComputeLoss:
         lcls *= self.hyp["cls"]
         bs = tobj.shape[0]  # batch size
 
-        lkdcl += kdcl_loss(p, targets)
+        # lkdcl += kdcl_loss(p, targets)
         lmask += imitation_loss(teacher, student, mask) * self.hyp.get("mask", 0)
         lcomp += compression_loss(self.model) * self.hyp.get("comp", 0)
 

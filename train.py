@@ -596,9 +596,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 loss = (1 - alpha) * ce_loss + (alpha) * div_loss
 
                 if model_idx < len(models) - 1:
-                    loss.backward(retain_graph=True)
+                    scaler.scale(loss).backward(retain_graph=True)
                 else:
-                    loss.backward()
+                    scaler.scale(loss).backward()
 
                 loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
                 acc = kdcl.accuracy(out_list[model_idx], targets)[0]
