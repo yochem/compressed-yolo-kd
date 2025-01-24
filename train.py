@@ -1075,6 +1075,7 @@ def main(opt, callbacks=Callbacks()):
             hyp = yaml.safe_load(f)  # load hyps dict
             if "anchors" not in hyp:  # anchors commented in hyp.yaml
                 hyp["anchors"] = 3
+            print(opt.comphyp)
             if opt.comphyp is not None:
                 hyp["comp"] = opt.comphyp
         if opt.noautoanchor:
