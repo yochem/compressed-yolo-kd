@@ -149,8 +149,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         colorstr("hyperparameters: ") + ", ".join(f"{k}={v}" for k, v in hyp.items())
     )
     opt.hyp = hyp.copy()  # for saving hyps to checkpoints
-        if opt.comphyp is not None:
-            hyp["comp"] = opt.comphyp
+    if opt.comphyp is not None:
+        hyp["comp"] = opt.comphyp
 
     # Save run settings
     if not evolve:
