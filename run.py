@@ -60,6 +60,7 @@ train_parser.add_argument("--epochs", default=50, type=int, help="Number of epoc
 train_parser.add_argument("--name", required=True, help="Name")
 train_parser.add_argument("--teacher-weight", help="Teacher weight file")
 train_parser.add_argument("--colab", action="store_true", help="KDCL mode")
+train_parser.add_argument("--comphyp", type=float, help="self-compression hyperparameter")
 train_parser.set_defaults(func=train_command)
 
 # Val subcommand
