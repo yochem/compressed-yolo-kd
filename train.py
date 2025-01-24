@@ -149,8 +149,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         colorstr("hyperparameters: ") + ", ".join(f"{k}={v}" for k, v in hyp.items())
     )
     opt.hyp = hyp.copy()  # for saving hyps to checkpoints
-    if opt.comphyp is not None:
-        hyp["comp"] = opt.comphyp
+        if opt.comphyp is not None:
+            hyp["comp"] = opt.comphyp
 
     # Save run settings
     if not evolve:
@@ -623,12 +623,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
                 if ni - last_opt_step >= accumulate:
                     scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+                    torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=10.0)
                     scaler.step(optimizer)
                     scaler.update()
                     optimizer.zero_grad()
                     if ema:
-                        ema.update(model)
+                        ema.update(m)
                     last_opt_step = ni
 
             # Log
