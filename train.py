@@ -225,12 +225,14 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             with torch_distributed_zero_first(LOCAL_RANK):
                 teacher_weight = attempt_download(teacher_weight)
             teacher_ckpt = torch.load(teacher_weight, map_location=device)
-            teacher_cfg = teacher_ckpt['model'].yaml
+            teacher_cfg = teacher_ckpt["model"].yaml
         else:
-            assert teacher_weight.endswith('.yaml'), 'teacher-weight should be a cfg'
+            assert teacher_weight.endswith(".yaml"), "teacher-weight should be a cfg"
             teacher_cfg = teacher_weight
 
-        teacher_model = Model(teacher_cfg, ch=3, nc=nc, anchors=hyp.get("anchors")).to(device)
+        teacher_model = Model(teacher_cfg, ch=3, nc=nc, anchors=hyp.get("anchors")).to(
+            device
+        )
 
         LOGGER.info(
             f"Load teacher model from {teacher_weight} with lmask={hyp.get('mask')}"
@@ -271,7 +273,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             opt.optimizer,
             hyp["lr0"],
             hyp["momentum"],
-            hyp["weight_decay"]
+            hyp["weight_decay"],
         )
         optims = (optimizer, teacher_optim)
 
@@ -279,8 +281,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     if opt.cos_lr:
         lf = one_cycle(1, hyp["lrf"], epochs)  # cosine 1->hyp['lrf']
     else:
+
         def lf(x):
             return (1 - x / epochs) * (1.0 - hyp["lrf"]) + hyp["lrf"]  # linear
+
     scheduler = lr_scheduler.LambdaLR(
         optimizer, lr_lambda=lf
     )  # plot_lr_scheduler(optimizer, scheduler, epochs)
@@ -382,9 +386,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     hyp["label_smoothing"] = opt.label_smoothing
     m.nc = nc  # attach number of classes to model
     m.hyp = hyp  # attach hyperparameters to model
-    m.class_weights = (
-        labels_to_class_weights(dataset.labels, nc).to(device) * nc
-    )
+    m.class_weights = labels_to_class_weights(dataset.labels, nc).to(device) * nc
     m.names = names
 
     if opt.teacher_weight:
@@ -456,7 +458,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             m.train()
             loss_recorder_list.append(kdcl.AverageMeter())
 
-
     # epoch ------------------------------------------------------------------
     for epoch in range(start_epoch, epochs):
         callbacks.run("on_train_epoch_start")
@@ -467,7 +468,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         # Update image weights (optional, single-GPU only)
         if opt.image_weights:
             # class weights
-            cw = (m.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc)
+            cw = m.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc
             # image weights
             iw = labels_to_image_weights(dataset.labels, nc=nc, class_weights=cw)
             # rand weighted idx
@@ -550,18 +551,26 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     preds = []
                     outputs = []
                     for model_idx, m in enumerate(models):
-                        pred, feature, *_ = m(imgs, target=targets)
-                        preds.append(pred)
+                        pred = m(imgs)
+                        preds.append(pred[0])
                         outputs.append(features)
                     stable_out = torch.vstack(tuple(outputs)).mean(dim=0).detach()
                 else:
                     if opt.teacher_weight:
                         pred, features, _ = m(imgs, target=targets)  # forward
-                        teacher_pred, teacher_feature, mask = teacher_model(imgs, target=targets)
+                        teacher_pred, teacher_feature, mask = teacher_model(
+                            imgs, target=targets
+                        )
                         # loss scaled by batch_size
                         teacher_feature = teacher_feature.detach()
                         mask = mask.detach()
-                        loss, loss_items = compute_loss(pred, targets, teacher_feature, stu_feature_adapt(features), mask)
+                        loss, loss_items = compute_loss(
+                            pred,
+                            targets,
+                            teacher_feature,
+                            stu_feature_adapt(features),
+                            mask,
+                        )
                     else:
                         pred = m(imgs)  # forward
                         # loss scaled by batch_size
@@ -707,9 +716,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     "loss_imitation": float(mloss[3]),
                     "loss_compression": float(mloss[4]),
                 }
-                r.update(
-                    {f"size_l{i}": int(ls) for i, ls in enumerate(layer_size(m))}
-                )
+                r.update({f"size_l{i}": int(ls) for i, ls in enumerate(layer_size(m))})
                 r.update(
                     {f"qbits_l{i}": int(ls) for i, ls in enumerate(layer_qbits(m))}
                 )
@@ -940,6 +947,11 @@ def parse_opt(known=False):
         default="latest",
         help="Version of dataset artifact to use",
     )
+    parser.add_argument(
+        "--comphyp",
+        type=float,
+        help="Hyperparameter for self-compression",
+    )
 
     return parser.parse_known_args()[0] if known else parser.parse_args()
 
@@ -1063,6 +1075,8 @@ def main(opt, callbacks=Callbacks()):
             hyp = yaml.safe_load(f)  # load hyps dict
             if "anchors" not in hyp:  # anchors commented in hyp.yaml
                 hyp["anchors"] = 3
+            if opt.comphyp is not None:
+                hyp["comp"] = opt.comphyp
         if opt.noautoanchor:
             del hyp["anchors"], meta["anchors"]
         opt.noval, opt.nosave, save_dir = (

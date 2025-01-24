@@ -18,7 +18,7 @@ def export_command(args):
 
 def train_command(args):
     if args.colab and args.teacher_weight is None:
-        print('colab requires teacher weight/cfg', file=sys.stderr)
+        print("colab requires teacher weight/cfg", file=sys.stderr)
         exit(1)
     import train
 
@@ -54,7 +54,7 @@ export_parser.set_defaults(func=export_command)
 # Train subcommand
 train_parser = subparsers.add_parser("train", parents=[common_parser])
 train_parser.add_argument("--cfg", required=True, help="model config")
-train_parser.add_argument("--hyp", default="params/hyp.yaml")
+# train_parser.add_argument("--hyp", default="params/hyp.yaml")
 train_parser.add_argument("--weights", default="")
 train_parser.add_argument("--epochs", default=50, type=int, help="Number of epochs")
 train_parser.add_argument("--name", required=True, help="Name")
