@@ -210,7 +210,7 @@ class ComputeLoss:
             if n:
                 # pxy, pwh, _, pcls = pi[b, a, gj, gi].tensor_split((2, 4, 5), dim=1)  # faster, requires torch 1.8.0
                 weird = pi[b, a, gj, gi]
-                print(weird.shape)
+                print(self.nc)
                 pxy, pwh, _, pcls = weird.split((2, 2, 1, self.nc), 1)
                 # target-subset of predictions
 
