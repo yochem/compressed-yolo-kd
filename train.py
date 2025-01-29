@@ -590,7 +590,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 T = 0.2
                 alpha = 0.5
                 for model_idx, m in enumerate(models):
-                    ce_loss, items = compute_loss(preds[model_idx], targets.copy())
+                    ce_loss, items = compute_loss(preds[model_idx], targets)
                     if loss_items is None:
                         loss_items = items
                     div_loss = (
