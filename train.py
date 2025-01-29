@@ -619,7 +619,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                         scaler.update()
                         optims[model_idx].zero_grad()
                         if ema and model_idx == 0:
-                            ema.update(model)
+                            ema.update(m)
                         last_opt_step = ni
             else:
                 scaler.scale(loss).backward()
