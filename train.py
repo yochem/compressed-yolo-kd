@@ -552,10 +552,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 if opt.colab:
                     preds = []
                     outputs = []
+                    losses = []
                     for model_idx, m in enumerate(models):
                         pred = m(imgs)
                         preds.append(pred[0])
                         outputs.append(features)
+                        losses.append(compute_loss(pred, targets))
                     stable_out = torch.vstack(tuple(outputs)).mean(dim=0).detach()
                 else:
                     if opt.teacher_weight:
@@ -590,7 +592,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 T = 0.2
                 alpha = 0.5
                 for model_idx, m in enumerate(models):
-                    ce_loss, items = compute_loss(preds[model_idx], targets)
+                    # ce_loss, items = compute_loss(preds[model_idx], targets)
+                    ce_loss, items = losses[model_idx]
                     if loss_items is None:
                         loss_items = items
                     div_loss = (
