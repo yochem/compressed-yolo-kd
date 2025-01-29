@@ -590,7 +590,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 T = 0.2
                 alpha = 0.5
                 for model_idx, m in enumerate(models):
-                    ce_loss, items = compute_loss(preds[model_idx], targets)
+                    ce_loss, items = compute_loss(preds[model_idx], targets.copy())
                     if loss_items is None:
                         loss_items = items
                     div_loss = (
@@ -730,6 +730,20 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 torch.save(ckpt, last)
                 if best_fitness == fi:
                     torch.save(ckpt, best)
+
+                if opt.colab:
+                    t_ckpt = {
+                        "epoch": epoch,
+                        "model": deepcopy(de_parallel(models[1])).half(),
+                        "ema": deepcopy(ema.ema).half(),
+                        "updates": None,
+                        "optimizer": optims[1].state_dict(),
+                        "opt": vars(opt),
+                        "git": GIT_INFO,  # {remote, branch, commit} if a git repo
+                        "date": datetime.now().isoformat(),
+                    }
+                    torch.save(t_ckpt, w / 'teacher_last.pt')
+                    del t_ckpt
 
                 del ckpt
                 callbacks.run(

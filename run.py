@@ -31,6 +31,7 @@ def val_command(args):
     args.save_conf = True
     args.save_json = True
     args.task = "test"
+    # runs/train/name/weights/best.pt --> name
     args.name = Path(args.weights).parent.parent.name
     val.run(**vars(args))
 
