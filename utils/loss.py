@@ -199,7 +199,7 @@ class ComputeLoss:
         tcls, tbox, indices, anchors = self.build_targets(p, targets)  # targets
 
         # Losses
-        print(p.shape, tcls.shape, tbox.shape, indices.shape, anchors.shape)
+        print(len(p), len(tcls), len(tbox), len(indices), len(anchors))
         for i, pi in enumerate(p):  # layer index, layer predictions
             b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
             tobj = torch.zeros(
