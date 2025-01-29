@@ -506,6 +506,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         optimizer.zero_grad()
         # batch -------------------------------------------------------------
         for i, (imgs, targets, paths, _) in pbar:
+            print(targets.shape, targets[0])
             callbacks.run("on_train_batch_start")
             ni = i + nb * epoch  # number integrated batches (since train start)
             # uint8 to float32, 0-255 to 0.0-1.0
@@ -590,7 +591,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 T = 0.2
                 alpha = 0.5
                 for model_idx, m in enumerate(models):
-                    print(targets)
+                    print(targets.shape, targets[0])
                     ce_loss, items = compute_loss(preds[model_idx], targets)
                     if loss_items is None:
                         loss_items = items
