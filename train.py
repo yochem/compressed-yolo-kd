@@ -456,8 +456,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     if opt.colab:
         models = (m, teacher_model)
         loss_recorder_list = []
-        for m in models:
-            m.train()
+        for model in models:
+            model.train()
             loss_recorder_list.append(kdcl.AverageMeter())
 
     # epoch ------------------------------------------------------------------
@@ -553,8 +553,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     preds = []
                     outputs = []
                     losses = []
-                    for model_idx, m in enumerate(models):
-                        pred = m(imgs)
+                    for model_idx, model in enumerate(models):
+                        pred = model(imgs)
                         preds.append(pred[0])
                         outputs.append(features)
                         losses.append(compute_loss(pred, targets))
@@ -591,7 +591,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 loss_items = None
                 T = 0.2
                 alpha = 0.5
-                for model_idx, m in enumerate(models):
+                for model_idx, _ in enumerate(models):
                     # ce_loss, items = compute_loss(preds[model_idx], targets)
                     ce_loss, items = losses[model_idx]
                     if loss_items is None:
@@ -614,12 +614,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
                     if ni - last_opt_step >= accumulate:
                         scaler.unscale_(optims[model_idx])
-                        torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=10.0)
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
                         scaler.step(optims[model_idx])
                         scaler.update()
                         optims[model_idx].zero_grad()
-                        if ema:
-                            ema.update(m)
+                        if ema and model_idx == 0:
+                            ema.update(model)
                         last_opt_step = ni
             else:
                 scaler.scale(loss).backward()
