@@ -1279,6 +1279,7 @@ class QConv(Conv):
     def qsize(self):
         all = sum(p.numel() for p in self.parameters())
         rest = (all - self.conv.weight.numel()) * 32
+        print(rest)
         return self.qbits().item() + rest
 
     def qweight(self):
