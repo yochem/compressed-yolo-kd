@@ -1267,8 +1267,7 @@ class QConv(Conv):
         super().__init__(c1, c2, k, s, p, g, d, act)
         self.__class__.count += 1
         self.__class__.weightcount += self.conv.weight.numel()
-        np = sum(p.numel() for p in self.parameters(recurse=False))
-        npr = sum(p.numel() for p in self.parameters(recurse=True))
+        self.rest_params = sum(p.numel() for p in self.parameters()) - self.conv.weight.numel()
         self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
         self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 32.0))
         print(np, npr, self.conv.weight.numel(), self.qsize() // 32)
@@ -1277,10 +1276,7 @@ class QConv(Conv):
         return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
 
     def qsize(self):
-        all = sum(p.numel() for p in self.parameters())
-        rest = (all - self.conv.weight.numel()) * 32
-        print(f'{all} - {self.conv.weight.numel()} + {self.qbits().item() // 32}')
-        return self.qbits().item() + rest
+        return self.qbits().item() + self.rest_params * 32
 
     def qweight(self):
         return torch.minimum(
