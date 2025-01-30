@@ -1271,7 +1271,7 @@ class QConv(Conv):
         npr = sum(p.numel() for p in self.parameters(recurse=True))
         self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
         self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 32.0))
-        print(np, npr, self.conv.weight.numel(), self.qsize())
+        print(np, npr, self.conv.weight.numel(), self.qsize() // 32)
 
     def qbits(self):
         return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
