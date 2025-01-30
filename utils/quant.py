@@ -33,14 +33,12 @@ def layer_size(model: nn.Module) -> list[int]:
 
 
 def model_size(model: nn.Module) -> int:
-    """In bytes."""
-
     def recursive_walk(module: nn.Module) -> list[float]:
         bits = []
 
         if isinstance(module, nn.Module):
-            if hasattr(module, "qbits") and callable(getattr(module, "qbits")):
-                bits.append(module.qbits().detach().item())
+            if hasattr(module, "qsize") and callable(getattr(module, "qsize")):
+                bits.append(module.qsize().item())
             else:
                 # torch default 32 bits
                 bits.append(
@@ -52,7 +50,7 @@ def model_size(model: nn.Module) -> int:
 
         return bits
 
-    return sum(recursive_walk(model)) // 8
+    return sum(recursive_walk(model))
 
 
 class JsonResults:

@@ -652,7 +652,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                         *mloss,
                         targets.shape[0],
                         imgs.shape[-1],
-                        modelbytes / 1e6,
+                        modelbytes // 8e6, # bits to mb
                     )
                 )
                 callbacks.run(
