@@ -1266,7 +1266,7 @@ class QConv(Conv):
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__(c1, c2, k, s, p, g, d, act)
         self.__class__.count += 1
-        self.__class__.weightcount += math.prod(self.conv.weight)
+        self.__class__.weightcount += self.conv.weight.numel()
         self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
         self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 32.0))
 
