@@ -1268,6 +1268,7 @@ class QConv(Conv):
         self.__class__.count += 1
         self.__class__.weightcount += self.conv.weight.numel()
         self.rest_params = sum(p.numel() for p in self.parameters()) - self.conv.weight.numel()
+        npr = sum(p.numel() for p in self.parameters())
         self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
         self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 32.0))
         print(np, npr, self.conv.weight.numel(), self.qsize() // 32)
