@@ -1268,9 +1268,9 @@ class QConv(Conv):
         super().__init__(c1, c2, k, s, p, g, d, act)
         self.__class__.count += 1
         self.__class__.weightcount += self.conv.weight.numel()
-        self.__class__.qbcount += self.qbits()
         self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
         self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 32.0))
+        self.__class__.qbcount += self.qbits()
 
     def qbits(self):
         return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
