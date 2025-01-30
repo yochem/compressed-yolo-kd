@@ -409,6 +409,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             "layers": [x.__class__.__name__ for x in m.model.children()],
         },
     )
+    # truncate files
+    with open(save_dir / "bytes.txt", "w") as f:
+        pass
+    with open(save_dir / "layer_sizes.txt", "w") as f:
+        pass
 
     # Start training
     t0 = time.time()

@@ -21,15 +21,15 @@ def total_qbits(model: nn.Module):
     return recursive_walk(model)
 
 
-def layer_size(model: nn.Module) -> list[int]:
+def layer_qbits(model: nn.Module) -> list[int]:
     return [
-        round(sum([x.detach().item() for x in total_qbits(layer)]))
+        round(sum([x.item() for x in total_qbits(layer)]))
         for layer in next(model.children())
     ]
 
 
-def layer_qbits(model: nn.Module) -> list[int]:
-    return [model_size(model) for layer in next(model.children())]
+def layer_size(model: nn.Module) -> list[int]:
+    return [model_size(layer) for layer in next(model.children())]
 
 
 def model_size(model: nn.Module) -> int:

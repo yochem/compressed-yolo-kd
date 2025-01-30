@@ -1262,7 +1262,6 @@ class Classify(nn.Module):
 class QConv(Conv):
     count = 0
     weightcount = 0
-    qbcount = 0
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__(c1, c2, k, s, p, g, d, act)
@@ -1270,7 +1269,6 @@ class QConv(Conv):
         self.__class__.weightcount += self.conv.weight.numel()
         self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
         self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 32.0))
-        self.__class__.qbcount += self.qbits()
 
     def qbits(self):
         return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
