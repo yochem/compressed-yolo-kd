@@ -38,7 +38,7 @@ def model_size(model: nn.Module) -> int:
 
         if isinstance(module, nn.Module):
             if hasattr(module, "qsize") and callable(getattr(module, "qsize")):
-                bits.append(module.qsize().item())
+                bits.append(module.qsize())
             else:
                 # torch default 32 bits
                 bits.append(
