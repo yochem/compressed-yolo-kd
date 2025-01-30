@@ -411,7 +411,7 @@ def model_info(model, verbose=False, imgsz=640):
     from models.common import QConv
 
     LOGGER.info(
-        f"{name} summary: {len(list(model.modules()))} layers, {n_p} parameters, {n_g} gradients, {n_q} ({QConv.weightcount}) quantizable layers{fs}"
+        f"{name} summary: {len(list(model.modules()))} layers, {n_p} parameters, {n_g} gradients, {n_q} QConv modules ({QConv.weightcount} params){fs}"
     )
 
 

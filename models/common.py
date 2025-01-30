@@ -379,18 +379,32 @@ class GhostBottleneck(nn.Module):
     def __init__(self, c1, c2, k=3, s=1):  # ch_in, ch_out, kernel, stride
         super().__init__()
         c_ = c2 // 2
-        self.conv = nn.Sequential(
-            GhostConv(c1, c_, 1, 1),  # pw
-            DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
-            GhostConv(c_, c2, 1, 1, act=False),
-        )  # pw-linear
-        self.shortcut = (
-            nn.Sequential(
-                DWConv(c1, c1, k, s, act=False), Conv(c1, c2, 1, 1, act=False)
+        if self.__class__.convclass == Conv:
+            self.conv = nn.Sequential(
+                GhostConv(c1, c_, 1, 1),  # pw
+                DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
+                GhostConv(c_, c2, 1, 1, act=False),
+            )  # pw-linear
+            self.shortcut = (
+                nn.Sequential(
+                    DWConv(c1, c1, k, s, act=False), Conv(c1, c2, 1, 1, act=False)
+                )
+                if s == 2
+                else nn.Identity()
             )
-            if s == 2
-            else nn.Identity()
-        )
+        else:
+            self.conv = nn.Sequential(
+                QGhostConv(c1, c_, 1, 1),  # pw
+                QDWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
+                QGhostConv(c_, c2, 1, 1, act=False),
+            )  # pw-linear
+            self.shortcut = (
+                nn.Sequential(
+                    QDWConv(c1, c1, k, s, act=False), QConv(c1, c2, 1, 1, act=False)
+                )
+                if s == 2
+                else nn.Identity()
+            )
 
     def forward(self, x):
         return self.conv(x) + self.shortcut(x)
@@ -1252,7 +1266,7 @@ class QConv(Conv):
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__(c1, c2, k, s, p, g, d, act)
         self.__class__.count += 1
-        self.__class__.weightcount += math.prod(self.conv.weight.shape[1:])
+        self.__class__.weightcount += math.prod(self.conv.weight)
         self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
         self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 32.0))
 

@@ -47,8 +47,8 @@ def model_size(model: nn.Module) -> int:
                     32 * sum(p.numel() for p in module.parameters(recurse=False))
                 )
 
-            for child in module.children():
-                bits.extend(recursive_walk(child))
+                for child in module.children():
+                    bits.extend(recursive_walk(child))
 
         return bits
 
