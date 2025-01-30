@@ -1277,9 +1277,9 @@ class QConv(Conv):
         return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
 
     def qsize(self):
-        all = sum(p.numel() for p in self.parameters())
-        rest = (all - self.conv.weight.numel()) * 32
-        return self.qbits() + rest
+        all = sum(p.numel().item() for p in self.parameters())
+        rest = (all - self.conv.weight.numel().item()) * 32
+        return self.qbits().item() + rest
 
     def qweight(self):
         return torch.minimum(
