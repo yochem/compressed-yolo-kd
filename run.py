@@ -29,10 +29,10 @@ def val_command(args):
     import val
 
     args.save_conf = True
-    args.save_json = True
     args.task = "test"
     # runs/train/name/weights/best.pt --> name
-    args.name = Path(args.weights).parent.parent.name
+    if not args.name:
+        args.name = Path(args.weights).parent.parent.name
     val.run(**vars(args))
 
 
@@ -67,6 +67,7 @@ train_parser.set_defaults(func=train_command)
 # Val subcommand
 val_parser = subparsers.add_parser("val", parents=[common_parser])
 val_parser.add_argument("--weights", required=True)
+val_parser.add_argument("--name", help='if you want different name')
 val_parser.set_defaults(func=val_command)
 
 args = parser.parse_args()
