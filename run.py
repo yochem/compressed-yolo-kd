@@ -70,7 +70,7 @@ train_parser.set_defaults(func=train_command)
 val_parser = subparsers.add_parser("val", parents=[common_parser])
 val_parser.add_argument("--weights", required=True)
 val_parser.add_argument("--name", help='if you want different name')
-val_parser.add_argument("--half", help='FP16')
+val_parser.add_argument("--half", action="store_true", help='FP16')
 val_parser.set_defaults(func=val_command)
 
 args = parser.parse_args()
