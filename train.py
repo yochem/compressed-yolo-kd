@@ -14,7 +14,6 @@ Models:     https://github.com/ultralytics/yolov5/tree/master/models
 Datasets:   https://github.com/ultralytics/yolov5/tree/master/data
 Tutorial:   https://docs.ultralytics.com/yolov5/tutorials/train_custom_data
 """
-
 import argparse
 import math
 import os
@@ -35,6 +34,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+import torch.nn.functional as F
 import yaml
 from torch.optim import lr_scheduler
 from tqdm import tqdm
@@ -60,7 +60,6 @@ from utils.general import (
     check_dataset,
     check_file,
     check_git_info,
-    check_git_status,
     check_img_size,
     check_requirements,
     check_suffix,
@@ -94,7 +93,8 @@ from utils.torch_utils import (
     smart_resume,
     torch_distributed_zero_first,
 )
-from utils.quant import model_size
+from utils.quant import model_size, layer_size, JsonResults, layer_qbits
+from utils import kdcl
 
 LOCAL_RANK = int(
     os.getenv("LOCAL_RANK", -1)
@@ -149,6 +149,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         colorstr("hyperparameters: ") + ", ".join(f"{k}={v}" for k, v in hyp.items())
     )
     opt.hyp = hyp.copy()  # for saving hyps to checkpoints
+    if opt.comphyp is not None:
+        hyp["comp"] = opt.comphyp
 
     # Save run settings
     if not evolve:
@@ -200,7 +202,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         ckpt = torch.load(
             weights, map_location="cpu"
         )  # load checkpoint to CPU to avoid CUDA memory leak
-        model = Model(
+        m = Model(
             cfg or ckpt["model"].yaml, ch=3, nc=nc, anchors=hyp.get("anchors")
         ).to(
             device
@@ -210,27 +212,29 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             ["anchor"] if (cfg or hyp.get("anchors")) and not resume else []
         )  # exclude keys
         csd = ckpt["model"].float().state_dict()  # checkpoint state_dict as FP32
-        csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
-        model.load_state_dict(csd, strict=False)  # load
+        csd = intersect_dicts(csd, m.state_dict(), exclude=exclude)  # intersect
+        m.load_state_dict(csd, strict=False)  # load
         LOGGER.info(
-            f"Transferred {len(csd)}/{len(model.state_dict())} items from {weights}"
+            f"Transferred {len(csd)}/{len(m.state_dict())} items from {weights}"
         )  # report
     else:
-        model = Model(cfg, ch=3, nc=nc, anchors=hyp.get("anchors")).to(device)  # create
-    amp = check_amp(model)  # check AMP
+        m = Model(cfg, ch=3, nc=nc, anchors=hyp.get("anchors")).to(device)  # create
+    amp = check_amp(m)  # check AMP
 
     if opt.teacher_weight:
         teacher_weight = opt.teacher_weight
-        with torch_distributed_zero_first(LOCAL_RANK):
-            teacher_weight = attempt_download(
-                teacher_weight
-            )  # download if not found locally
-        teacher_ckpt = torch.load(teacher_weight, map_location=device)
-        teacher_model = Model(
-            cfg or teacher_ckpt["model"].yaml, ch=3, nc=nc, anchors=hyp.get("anchors")
-        ).to(
+        if not opt.colab:
+            with torch_distributed_zero_first(LOCAL_RANK):
+                teacher_weight = attempt_download(teacher_weight)
+            teacher_ckpt = torch.load(teacher_weight, map_location=device)
+            teacher_cfg = teacher_ckpt["model"].yaml
+        else:
+            assert teacher_weight.endswith(".yaml"), "teacher-weight should be a cfg"
+            teacher_cfg = teacher_weight
+
+        teacher_model = Model(teacher_cfg, ch=3, nc=nc, anchors=hyp.get("anchors")).to(
             device
-        )  # create
+        )
 
         LOGGER.info(
             f"Load teacher model from {teacher_weight} with lmask={hyp.get('mask')}"
@@ -242,7 +246,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     freeze = [
         f"model.{x}." for x in (freeze if len(freeze) > 1 else range(freeze[0]))
     ]  # layers to freeze
-    for k, v in model.named_parameters():
+    for k, v in m.named_parameters():
         v.requires_grad = True  # train all layers
         # v.register_hook(lambda x: torch.nan_to_num(x))  # NaN to 0 (commented for erratic training results)
         if any(x in k for x in freeze):
@@ -250,12 +254,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             v.requires_grad = False
 
     # Image size
-    gs = max(int(model.stride.max()), 32)  # grid size (max stride)
+    gs = max(int(m.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
 
     # Batch size
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
-        batch_size = check_train_batch_size(model, imgsz, amp)
+        batch_size = check_train_batch_size(m, imgsz, amp)
         loggers.on_params_update({"batch_size": batch_size})
 
     # Optimizer
@@ -263,20 +267,32 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
     hyp["weight_decay"] *= batch_size * accumulate / nbs  # scale weight_decay
     optimizer = smart_optimizer(
-        model, opt.optimizer, hyp["lr0"], hyp["momentum"], hyp["weight_decay"]
+        m, opt.optimizer, hyp["lr0"], hyp["momentum"], hyp["weight_decay"]
     )
+    if opt.colab:
+        teacher_optim = smart_optimizer(
+            teacher_model,
+            opt.optimizer,
+            hyp["lr0"],
+            hyp["momentum"],
+            hyp["weight_decay"],
+        )
+        optims = (optimizer, teacher_optim)
 
     # Scheduler
     if opt.cos_lr:
         lf = one_cycle(1, hyp["lrf"], epochs)  # cosine 1->hyp['lrf']
     else:
-        lf = lambda x: (1 - x / epochs) * (1.0 - hyp["lrf"]) + hyp["lrf"]  # linear
+
+        def lf(x):
+            return (1 - x / epochs) * (1.0 - hyp["lrf"]) + hyp["lrf"]  # linear
+
     scheduler = lr_scheduler.LambdaLR(
         optimizer, lr_lambda=lf
     )  # plot_lr_scheduler(optimizer, scheduler, epochs)
 
     # EMA
-    ema = ModelEMA(model) if RANK in {-1, 0} else None
+    ema = ModelEMA(m) if RANK in {-1, 0} else None
 
     # Resume
     best_fitness, start_epoch = 0.0, 0
@@ -293,13 +309,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             "WARNING ⚠️ DP not recommended, use torch.distributed.run for best DDP Multi-GPU results.\n"
             "See Multi-GPU Tutorial at https://docs.ultralytics.com/yolov5/tutorials/multi_gpu_training to get started."
         )
-        model = torch.nn.DataParallel(model)
+        m = torch.nn.DataParallel(m)
         if opt.teacher_weight:
             teacher_model = torch.nn.DataParallel(teacher_model)
 
     # SyncBatchNorm
     if opt.sync_bn and cuda and RANK != -1:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
+        m = torch.nn.SyncBatchNorm.convert_sync_batchnorm(m).to(device)
 
         if opt.teacher_weight:
             teacher_model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
@@ -352,30 +368,28 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         if not resume:
             if not opt.noautoanchor:
                 check_anchors(
-                    dataset, model=model, thr=hyp["anchor_t"], imgsz=imgsz
+                    dataset, model=m, thr=hyp["anchor_t"], imgsz=imgsz
                 )  # run AutoAnchor
-            model.half().float()  # pre-reduce anchor precision
+            m.half().float()  # pre-reduce anchor precision
 
         callbacks.run("on_pretrain_routine_end", labels, names)
 
     # DDP mode
     if cuda and RANK != -1:
-        model = smart_DDP(model)
+        m = smart_DDP(m)
         if opt.teacher_weight:
             teacher_model = smart_DDP(teacher_model)
 
     # Model attributes
-    nl = de_parallel(model).model[-1].nl  # number of detection layers (to scale hyps)
+    nl = de_parallel(m).model[-1].nl  # number of detection layers (to scale hyps)
     hyp["box"] *= 3 / nl  # scale to layers
     hyp["cls"] *= nc / 80 * 3 / nl  # scale to classes and layers
     hyp["obj"] *= (imgsz / 640) ** 2 * 3 / nl  # scale to image size and layers
     hyp["label_smoothing"] = opt.label_smoothing
-    model.nc = nc  # attach number of classes to model
-    model.hyp = hyp  # attach hyperparameters to model
-    model.class_weights = (
-        labels_to_class_weights(dataset.labels, nc).to(device) * nc
-    )  # attach class weights
-    model.names = names
+    m.nc = nc  # attach number of classes to model
+    m.hyp = hyp  # attach hyperparameters to model
+    m.class_weights = labels_to_class_weights(dataset.labels, nc).to(device) * nc
+    m.names = names
 
     if opt.teacher_weight:
         teacher_model.nc = nc  # attach number of classes to model
@@ -385,8 +399,21 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         )  # attach class weights
         teacher_model.names = names
 
-        for param in teacher_model.parameters():
-            param.requires_grad = False
+        if not opt.colab:
+            for param in teacher_model.parameters():
+                param.requires_grad = False
+
+    result_file = JsonResults(
+        save_dir / "results.json",
+        {
+            "layers": [x.__class__.__name__ for x in m.model.children()],
+        },
+    )
+    # truncate files
+    with open(save_dir / "bytes.txt", "w") as f:
+        pass
+    with open(save_dir / "layer_sizes.txt", "w") as f:
+        pass
 
     # Start training
     t0 = time.time()
@@ -401,7 +428,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = torch.amp.GradScaler("cuda", enabled=amp)
     stopper, stop = EarlyStopping(patience=opt.patience), False
-    compute_loss = ComputeLoss(model)  # init loss class
+    compute_loss = ComputeLoss(m)  # init loss class
     callbacks.run("on_train_start")
     LOGGER.info(
         f"Image sizes {imgsz} train, {imgsz} val\n"
@@ -413,7 +440,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     if opt.teacher_weight:
         dump_image = torch.zeros((1, 3, opt.imgsz, opt.imgsz), device=device)
         targets = torch.Tensor([[0, 0, 0, 0, 0, 0]]).to(device)
-        _, features, _ = model(dump_image, target=targets)  # forward
+        _, features, _ = m(dump_image, target=targets)  # forward
         _, teacher_feature, _ = teacher_model(dump_image, target=targets)
 
         _, student_channel, student_out_size, _ = features.shape
@@ -430,25 +457,29 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             nn.ReLU(),
         ).to(device)
 
-    for epoch in range(
-        start_epoch, epochs
-    ):  # epoch ------------------------------------------------------------------
+    # kdcl
+    if opt.colab:
+        models = (m, teacher_model)
+        loss_recorder_list = []
+        for model in models:
+            model.train()
+            loss_recorder_list.append(kdcl.AverageMeter())
+
+    # epoch ------------------------------------------------------------------
+    for epoch in range(start_epoch, epochs):
         callbacks.run("on_train_epoch_start")
-        model.train()
+        m.train()
         if opt.teacher_weight:
-            teacher_model.eval()
+            teacher_model.train() if opt.colab else teacher_model.eval()
 
         # Update image weights (optional, single-GPU only)
         if opt.image_weights:
-            cw = (
-                model.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc
-            )  # class weights
-            iw = labels_to_image_weights(
-                dataset.labels, nc=nc, class_weights=cw
-            )  # image weights
-            dataset.indices = random.choices(
-                range(dataset.n), weights=iw, k=dataset.n
-            )  # rand weighted idx
+            # class weights
+            cw = m.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc
+            # image weights
+            iw = labels_to_image_weights(dataset.labels, nc=nc, class_weights=cw)
+            # rand weighted idx
+            dataset.indices = random.choices(range(dataset.n), weights=iw, k=dataset.n)
 
         # Update mosaic border (optional)
         # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
@@ -478,20 +509,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         if RANK in {-1, 0}:
             pbar = tqdm(pbar, total=nb, bar_format=TQDM_BAR_FORMAT)  # progress bar
         optimizer.zero_grad()
-        weight_count = sum(t.numel() for t in model.parameters())
-        for i, (
-            imgs,
-            targets,
-            paths,
-            _,
-        ) in (
-            pbar
-        ):  # batch -------------------------------------------------------------
+        # batch -------------------------------------------------------------
+        for i, (imgs, targets, paths, _) in pbar:
             callbacks.run("on_train_batch_start")
             ni = i + nb * epoch  # number integrated batches (since train start)
-            imgs = (
-                imgs.to(device, non_blocking=True).float() / 255
-            )  # uint8 to float32, 0-255 to 0.0-1.0
+            # uint8 to float32, 0-255 to 0.0-1.0
+            imgs = imgs.to(device, non_blocking=True).float() / 255
 
             # Warmup
             if ni <= nw:
@@ -531,21 +554,36 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
             with torch.amp.autocast("cuda"):
                 targets = targets.to(device)
-                if opt.teacher_weight:
-                    pred, features, _ = model(imgs, target=targets)  # forward
-                    _, teacher_feature, mask = teacher_model(imgs, target=targets)
-                    loss, loss_items = compute_loss(
-                        pred,
-                        targets,
-                        teacher_feature.detach(),
-                        stu_feature_adapt(features),
-                        mask.detach(),
-                    )  # loss scaled by batch_size
+                if opt.colab:
+                    preds = []
+                    outputs = []
+                    losses = []
+                    for model_idx, model in enumerate(models):
+                        pred = model(imgs)
+                        preds.append(pred[0])
+                        outputs.append(features)
+                        losses.append(compute_loss(pred, targets))
+                    stable_out = torch.vstack(tuple(outputs)).mean(dim=0).detach()
                 else:
-                    pred = model(imgs)  # forward
-                    loss, loss_items = compute_loss(
-                        pred, targets
-                    )  # loss scaled by batch_size
+                    if opt.teacher_weight:
+                        pred, features, _ = m(imgs, target=targets)  # forward
+                        teacher_pred, teacher_feature, mask = teacher_model(
+                            imgs, target=targets
+                        )
+                        # loss scaled by batch_size
+                        teacher_feature = teacher_feature.detach()
+                        mask = mask.detach()
+                        loss, loss_items = compute_loss(
+                            pred,
+                            targets,
+                            teacher_feature,
+                            stu_feature_adapt(features),
+                            mask,
+                        )
+                    else:
+                        pred = m(imgs)  # forward
+                        # loss scaled by batch_size
+                        loss, loss_items = compute_loss(pred, targets)
 
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
@@ -553,26 +591,57 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     loss *= 4.0
 
             # Backward
-            scaler.scale(loss).backward()
+            if opt.colab:
+                # save STUDENT loss items
+                loss_items = None
+                T = 0.2
+                alpha = 0.5
+                for model_idx, _ in enumerate(models):
+                    # ce_loss, items = compute_loss(preds[model_idx], targets)
+                    ce_loss, items = losses[model_idx]
+                    if loss_items is None:
+                        loss_items = items
+                    div_loss = (
+                        F.kl_div(
+                            F.log_softmax(outputs[model_idx] / T, dim=0),
+                            F.softmax(stable_out / T, dim=0),
+                            reduction="batchmean",
+                        )
+                        * T
+                        * T
+                    )
 
-            # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-            if ni - last_opt_step >= accumulate:
-                scaler.unscale_(optimizer)  # unscale gradients
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), max_norm=10.0
-                )  # clip gradients
-                scaler.step(optimizer)  # optimizer.step
-                scaler.update()
-                optimizer.zero_grad()
-                if ema:
-                    ema.update(model)
-                last_opt_step = ni
+                    loss = (1 - alpha) * ce_loss + (alpha) * div_loss
+                    loss = ce_loss
+
+                    loss_recorder_list[model_idx].update(loss.item(), n=imgs.size(0))
+                    scaler.scale(loss).backward(retain_graph=True)
+
+                    if ni - last_opt_step >= accumulate:
+                        scaler.unscale_(optims[model_idx])
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+                        scaler.step(optims[model_idx])
+                        scaler.update()
+                        optims[model_idx].zero_grad()
+                        if ema and model_idx == 0:
+                            ema.update(m)
+                        last_opt_step = ni
+            else:
+                scaler.scale(loss).backward()
+
+                if ni - last_opt_step >= accumulate:
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=10.0)
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad()
+                    if ema:
+                        ema.update(m)
+                    last_opt_step = ni
 
             # Log
+            modelbytes = model_size(m)
             if RANK in {-1, 0}:
-                modelbytes = model_size(model)
-                with open(save_dir / "bytes.txt", "a") as f:
-                    f.write(f"{modelbytes}\n")
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
                 pbar.set_description(
@@ -583,11 +652,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                         *mloss,
                         targets.shape[0],
                         imgs.shape[-1],
-                        modelbytes / 1e6,
+                        modelbytes / 8e6, # bits to mb
                     )
                 )
                 callbacks.run(
-                    "on_train_batch_end", model, ni, imgs, targets, paths, list(mloss)
+                    "on_train_batch_end", m, ni, imgs, targets, paths, list(mloss)
                 )
                 if callbacks.stop_training:
                     return
@@ -601,8 +670,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # mAP
             callbacks.run("on_train_epoch_end", epoch=epoch)
             ema.update_attr(
-                model, include=["yaml", "nc", "hyp", "names", "stride", "class_weights"]
+                m, include=["yaml", "nc", "hyp", "names", "stride", "class_weights"]
             )
+            with open(save_dir / "bytes.txt", "a") as f:
+                f.write(f"{epoch} {modelbytes}\n")
+            with open(save_dir / "layer_sizes.txt", "a") as f:
+                f.write(f"{epoch} {layer_size(m)}\n")
             final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
             if not noval or final_epoch:  # Calculate mAP
                 results, maps, _ = validate.run(
@@ -634,7 +707,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 ckpt = {
                     "epoch": epoch,
                     "best_fitness": best_fitness,
-                    "model": deepcopy(de_parallel(model)).half(),
+                    "model": deepcopy(de_parallel(m)).half(),
                     "ema": deepcopy(ema.ema).half(),
                     "updates": ema.updates,
                     "optimizer": optimizer.state_dict(),
@@ -642,12 +715,43 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     "git": GIT_INFO,  # {remote, branch, commit} if a git repo
                     "date": datetime.now().isoformat(),
                 }
+                r = {
+                    "epoch": int(epoch),
+                    "precision": float(results[0]),
+                    "recall": float(results[1]),
+                    "size_total": int(modelbytes),
+                    "loss_bbox": float(mloss[0]),
+                    "loss_object": float(mloss[1]),
+                    "loss_class": float(mloss[2]),
+                    "loss_imitation": float(mloss[3]),
+                    "loss_compression": float(mloss[4]),
+                }
+                r.update({f"size_l{i}": int(ls) for i, ls in enumerate(layer_size(m))})
+                r.update(
+                    {f"qbits_l{i}": int(ls) for i, ls in enumerate(layer_qbits(m))}
+                )
+                result_file.add_epoch(r)
+                result_file.write()
 
                 # Save last, best and delete
 
                 torch.save(ckpt, last)
                 if best_fitness == fi:
                     torch.save(ckpt, best)
+
+                if opt.colab:
+                    t_ckpt = {
+                        "epoch": epoch,
+                        "model": deepcopy(de_parallel(models[1])).half(),
+                        "ema": deepcopy(ema.ema).half(),
+                        "updates": None,
+                        "optimizer": optims[1].state_dict(),
+                        "opt": vars(opt),
+                        "git": GIT_INFO,  # {remote, branch, commit} if a git repo
+                        "date": datetime.now().isoformat(),
+                    }
+                    torch.save(t_ckpt, w / 'teacher_last.pt')
+                    del t_ckpt
 
                 del ckpt
                 callbacks.run(
@@ -716,6 +820,7 @@ def parse_opt(known=False):
     parser.add_argument(
         "--teacher_weight", type=str, default="", help="initial weights path"
     )
+    parser.add_argument("--colab", action="store_true", help="train teacher too")
     parser.add_argument("--cfg", type=str, default="", help="model.yaml path")
     parser.add_argument(
         "--data", type=str, default=ROOT / "data/coco128.yaml", help="dataset.yaml path"
@@ -866,6 +971,11 @@ def parse_opt(known=False):
         default="latest",
         help="Version of dataset artifact to use",
     )
+    parser.add_argument(
+        "--comphyp",
+        type=float,
+        help="Hyperparameter for self-compression",
+    )
 
     return parser.parse_known_args()[0] if known else parser.parse_args()
 
@@ -874,7 +984,7 @@ def main(opt, callbacks=Callbacks()):
     # Checks
     if RANK in {-1, 0}:
         print_args(vars(opt))
-        check_git_status()
+        # check_git_status()
         check_requirements(ROOT / "requirements.txt")
 
     # Resume (from specified or most recent last.pt)

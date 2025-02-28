@@ -23,7 +23,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from PIL import Image
-from torch.cuda import amp
 
 # Import 'ultralytics' package or install if if missing
 try:
@@ -57,7 +56,23 @@ from utils.general import (
     xyxy2xywh,
     yaml_load,
 )
-from utils.torch_utils import copy_attr, smart_inference_mode
+
+
+def copy_attr(a, b, include=(), exclude=()):
+    # Copy attributes from b to a, options to only include [...] and to exclude [...]
+    for k, v in b.__dict__.items():
+        if (len(include) and k not in include) or k.startswith("_") or k in exclude:
+            continue
+        else:
+            setattr(a, k, v)
+
+
+def smart_inference_mode(torch_1_9=check_version(torch.__version__, "1.9.0")):
+    # Applies torch.inference_mode() decorator if torch>=1.9.0 else torch.no_grad() decorator
+    def decorate(fn):
+        return (torch.inference_mode if torch_1_9 else torch.no_grad)()(fn)
+
+    return decorate
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
@@ -364,18 +379,32 @@ class GhostBottleneck(nn.Module):
     def __init__(self, c1, c2, k=3, s=1):  # ch_in, ch_out, kernel, stride
         super().__init__()
         c_ = c2 // 2
-        self.conv = nn.Sequential(
-            GhostConv(c1, c_, 1, 1),  # pw
-            DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
-            GhostConv(c_, c2, 1, 1, act=False),
-        )  # pw-linear
-        self.shortcut = (
-            nn.Sequential(
-                DWConv(c1, c1, k, s, act=False), Conv(c1, c2, 1, 1, act=False)
+        if self.__class__.convclass == Conv:
+            self.conv = nn.Sequential(
+                GhostConv(c1, c_, 1, 1),  # pw
+                DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
+                GhostConv(c_, c2, 1, 1, act=False),
+            )  # pw-linear
+            self.shortcut = (
+                nn.Sequential(
+                    DWConv(c1, c1, k, s, act=False), Conv(c1, c2, 1, 1, act=False)
+                )
+                if s == 2
+                else nn.Identity()
             )
-            if s == 2
-            else nn.Identity()
-        )
+        else:
+            self.conv = nn.Sequential(
+                QGhostConv(c1, c_, 1, 1),  # pw
+                QDWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
+                QGhostConv(c_, c2, 1, 1, act=False),
+            )  # pw-linear
+            self.shortcut = (
+                nn.Sequential(
+                    QDWConv(c1, c1, k, s, act=False), QConv(c1, c2, 1, 1, act=False)
+                )
+                if s == 2
+                else nn.Identity()
+            )
 
     def forward(self, x):
         return self.conv(x) + self.shortcut(x)
@@ -1232,15 +1261,21 @@ class Classify(nn.Module):
 
 class QConv(Conv):
     count = 0
+    weightcount = 0
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__(c1, c2, k, s, p, g, d, act)
         self.__class__.count += 1
+        self.__class__.weightcount += self.conv.weight.numel()
+        self.rest_params = sum(p.numel() for p in self.parameters()) - self.conv.weight.numel()
         self.e = nn.Parameter(torch.full((c2, 1, 1, 1), -8.0))
-        self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 2.0))
+        self.b = nn.Parameter(torch.full((c2, 1, 1, 1), 32.0))
 
     def qbits(self):
         return F.relu(self.b).sum() * math.prod(self.conv.weight.shape[1:])
+
+    def qsize(self):
+        return round(self.qbits().item() + self.rest_params * 32)
 
     def qweight(self):
         return torch.minimum(
@@ -1270,97 +1305,29 @@ class QDWConv(QConv):
         super().__init__(c1, c2, k, s, g=math.gcd(c1, c2), d=d, act=act)
 
 
-class QDWConvTranspose2d(DWConvTranspose2d):
-    convclass = QConv
-
-
-class QTransformerLayer(TransformerLayer):
-    convclass = QConv
-
-
-class QTransformerBlock(TransformerBlock):
-    convclass = QConv
-
-
-class QBottleneck(Bottleneck):
-    convclass = QConv
-
-
-class QBottleneckCSP(BottleneckCSP):
-    convclass = QConv
-
-
-class QCrossConv(CrossConv):
-    convclass = QConv
-
-
-class QC3(C3):
-    convclass = QConv
-
-
-class QC3x(C3x):
-    convclass = QConv
-
-
-class QC3TR(C3TR):
-    convclass = QConv
-
-
-class QC3SPP(C3SPP):
-    convclass = QConv
-
-
-class QC3Ghost(C3Ghost):
-    convclass = QConv
-
-
-class QSPP(SPP):
-    convclass = QConv
-
-
-class QSPPF(SPPF):
-    convclass = QConv
-
-
-class QFocus(Focus):
-    convclass = QConv
-
-
-class QGhostConv(GhostConv):
-    convclass = QConv
-
-
-class QGhostBottleneck(GhostBottleneck):
-    convclass = QConv
-
-
-class QContract(Contract):
-    convclass = QConv
-
-
-class QExpand(Expand):
-    convclass = QConv
-
-
-class QConcat(Concat):
-    convclass = QConv
-
-
-class QDetectMultiBackend(DetectMultiBackend):
-    convclass = QConv
-
-
-class QAutoShape(AutoShape):
-    convclass = QConv
-
-
-class QDetections:
-    convclass = QConv
-
-
-class QProto(Proto):
-    convclass = QConv
-
-
-class QClassify(Classify):
-    convclass = QConv
+# fmt: off
+class QDWConvTranspose2d(DWConvTranspose2d): convclass = QConv
+class QTransformerLayer(TransformerLayer): convclass = QConv
+class QTransformerBlock(TransformerBlock): convclass = QConv
+class QBottleneck(Bottleneck): convclass = QConv
+class QBottleneckCSP(BottleneckCSP): convclass = QConv
+class QCrossConv(CrossConv): convclass = QConv
+class QC3(C3): convclass = QConv
+class QC3x(C3x): convclass = QConv
+class QC3TR(C3TR): convclass = QConv
+class QC3SPP(C3SPP): convclass = QConv
+class QC3Ghost(C3Ghost): convclass = QConv
+class QSPP(SPP): convclass = QConv
+class QSPPF(SPPF): convclass = QConv
+class QFocus(Focus): convclass = QConv
+class QGhostConv(GhostConv): convclass = QConv
+class QGhostBottleneck(GhostBottleneck): convclass = QConv
+class QContract(Contract): convclass = QConv
+class QExpand(Expand): convclass = QConv
+class QConcat(Concat): convclass = QConv
+class QDetectMultiBackend(DetectMultiBackend): convclass = QConv
+class QAutoShape(AutoShape): convclass = QConv
+class QDetections: convclass = QConv
+class QProto(Proto): convclass = QConv
+class QClassify(Classify): convclass = QConv
+# fmt: on
